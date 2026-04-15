@@ -143,7 +143,7 @@ function StudentPreview({ exercise, onClose }) {
           {/* Topic + pagina badge */}
           <div style={{ background: C.yellow, display: 'inline-block', padding: '4px 12px',
             borderRadius: 6, fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 14 }}>
-            Pagina {exercise.page} &middot; {exercise.topic}
+            Pagina {exercise.page} · {exercise.topic}
           </div>
 
           {/* Niveau-indicator (alleen als er varianten zijn) */}
@@ -371,6 +371,57 @@ export default function EduUpcycleApp() {
       setSelectedId(1);
       setStep(2);
 
+    } catch (err) {
+      console.error('Process error:', err);
+      setError(`Fout bij verwerking: ${err.message}`);
+      setStep(0);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ── Exercise actions ────────────────────────────────────────────────
+  const doStatus = (id, status) => {
+    setExercises(ex => ex.map(e => e.id === id ? { ...e, status } : e));
+    const next = exercises.find(e => e.status === null && e.id !== id);
+    if (next) setSelectedId(next.id);
+  };
+
+  const doSaveType = () => {
+    setExercises(ex => ex.map(e => e.id === selectedId ? { ...e, type: editedType } : e));
+    setEditingType(false);
+  };
+
+  // ── Opslaan naar Supabase ───────────────────────────────────────────
+  const doSave = async () => {
+    const approved = exercises.filter(e => e.status === 'approved');
+    if (approved.length === 0) { setStep(3); return; }
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/save-exercises', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ exercises: approved }),
+      });
+      const data = await res.json();
+
+      if (data.saved?.length > 0) {
+        // Supabase werkt → sla links op voor de student-pagina
+        setSavedLinks(data.saved.map(ex => ({ id: ex.id, title: ex.title })));
+      } else {
+        // Supabase niet geconfigureerd of fout → alleen JSON export beschikbaar
+        setSavedLinks([]);
+      }
+    } catch (err) {
+      console.warn('Supabase opslaan mislukt:', err.message);
+      setSavedLinks([]);
+    } finally {
+      setSaving(false);
+      setStep(3);
+    }
+  };
+
   // ── Drop handlers ───────────────────────────────────────────────────
   const onDrop = useCallback((e) => {
     e.preventDefault(); setDragOver(false);
@@ -465,7 +516,7 @@ export default function EduUpcycleApp() {
               <div style={{ fontWeight: 700, color: C.purple, fontSize: 15 }}>
                 {files.length === 0 ? 'Sleep PDFs hier of klik om te bladeren' : `${files.length} bestand(en) geselecteerd`}
               </div>
-              <div style={{ fontSize: 12, color: C.textMid }}>Alleen PDF-bestanden &middot; meerdere bestanden tegelijk mogelijk</div>
+              <div style={{ fontSize: 12, color: C.textMid }}>Alleen PDF-bestanden · meerdere bestanden tegelijk mogelijk</div>
             </div>
 
             {/* File list */}
@@ -550,7 +601,7 @@ export default function EduUpcycleApp() {
                 <h1 style={{ fontSize: 22, fontWeight: 800, color: C.purple, marginBottom: 4 }}>Beoordelen & valideren</h1>
                 <p style={{ color: C.textMid, fontSize: 13 }}>
                   {approved} van {exercises.length} oefeningen goedgekeurd
-                  {allDone && <span style={{ color: C.green, fontWeight: 700, marginLeft: 8 }}>&middot; Alles beoordeeld!</span>}
+                  {allDone && <span style={{ color: C.green, fontWeight: 700, marginLeft: 8 }}>· Alles beoordeeld!</span>}
                 </p>
               </div>
               {allDone && (
@@ -794,7 +845,7 @@ export default function EduUpcycleApp() {
               <div style={{ width: 560, background: C.greenLight, borderRadius: 12,
                 padding: '16px 20px', border: `1.5px solid ${C.green}` }}>
                 <div style={{ fontWeight: 700, color: C.green, marginBottom: 12, fontSize: 14 }}>
-                  ✓ Opgeslagen in database &middot; Deel deze links met leerlingen:
+                  ✓ Opgeslagen in database · Deel deze links met leerlingen:
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {savedLinks.map(link => (
