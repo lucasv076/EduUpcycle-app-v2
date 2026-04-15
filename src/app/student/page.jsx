@@ -76,9 +76,7 @@ export default async function StudentListPage() {
               <Link key={ex.id} href={`/student/${ex.id}`} style={{ textDecoration: 'none' }}>
                 <div style={{ background: C.white, borderRadius: 12, padding: '18px 20px',
                   border: `1.5px solid ${C.border}`, transition: 'all 0.15s',
-                  boxShadow: '0 2px 8px rgba(109,32,119,0.06)', cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = C.purple}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                  boxShadow: '0 2px 8px rgba(109,32,119,0.06)', cursor: 'pointer' }}>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between',
                     alignItems: 'flex-start', marginBottom: 10 }}>
@@ -90,7 +88,7 @@ export default async function StudentListPage() {
                   </div>
 
                   <div style={{ fontSize: 12, color: C.textMid, marginBottom: 12, lineHeight: 1.5 }}>
-                    {ex.topic} &middot; Pagina {ex.page}
+                    {ex.topic} · Pagina {ex.page}
                   </div>
 
                   {/* Variant-preview */}
