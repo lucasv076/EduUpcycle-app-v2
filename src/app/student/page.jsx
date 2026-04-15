@@ -90,7 +90,7 @@ export default async function StudentListPage() {
                   </div>
 
                   <div style={{ fontSize: 12, color: C.textMid, marginBottom: 12, lineHeight: 1.5 }}>
-                    {ex.topic} · Pagina {ex.page}
+                    {ex.topic} &middot; Pagina {ex.page}
                   </div>
 
                   {/* Variant-preview */}
