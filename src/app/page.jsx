@@ -143,7 +143,7 @@ function StudentPreview({ exercise, onClose }) {
           {/* Topic + pagina badge */}
           <div style={{ background: C.yellow, display: 'inline-block', padding: '4px 12px',
             borderRadius: 6, fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 14 }}>
-            Pagina {exercise.page} · {exercise.topic}
+            Pagina {exercise.page} &middot; {exercise.topic}
           </div>
 
           {/* Niveau-indicator (alleen als er varianten zijn) */}
@@ -491,7 +491,7 @@ export default function EduUpcycleApp() {
               <div style={{ fontWeight: 700, color: C.purple, fontSize: 15 }}>
                 {files.length === 0 ? 'Sleep PDFs hier of klik om te bladeren' : `${files.length} bestand(en) geselecteerd`}
               </div>
-              <div style={{ fontSize: 12, color: C.textMid }}>Alleen PDF-bestanden · meerdere bestanden tegelijk mogelijk</div>
+              <div style={{ fontSize: 12, color: C.textMid }}>Alleen PDF-bestanden &middot; meerdere bestanden tegelijk mogelijk</div>
             </div>
 
             {/* File list */}
@@ -576,7 +576,7 @@ export default function EduUpcycleApp() {
                 <h1 style={{ fontSize: 22, fontWeight: 800, color: C.purple, marginBottom: 4 }}>Beoordelen & valideren</h1>
                 <p style={{ color: C.textMid, fontSize: 13 }}>
                   {approved} van {exercises.length} oefeningen goedgekeurd
-                  {allDone && <span style={{ color: C.green, fontWeight: 700, marginLeft: 8 }}>· Alles beoordeeld!</span>}
+                  {allDone && <span style={{ color: C.green, fontWeight: 700, marginLeft: 8 }}>&middot; Alles beoordeeld!</span>}
                 </p>
               </div>
               {allDone && (
@@ -820,7 +820,7 @@ export default function EduUpcycleApp() {
               <div style={{ width: 560, background: C.greenLight, borderRadius: 12,
                 padding: '16px 20px', border: `1.5px solid ${C.green}` }}>
                 <div style={{ fontWeight: 700, color: C.green, marginBottom: 12, fontSize: 14 }}>
-                  ✓ Opgeslagen in database · Deel deze links met leerlingen:
+                  ✓ Opgeslagen in database &middot; Deel deze links met leerlingen:
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {savedLinks.map(link => (

@@ -100,7 +100,7 @@ export default function ExercisePage({ exercise }) {
         {/* Topic badge */}
         <div style={{ background: C.yellow, display: 'inline-block', padding: '5px 14px',
           borderRadius: 8, fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 16 }}>
-          Pagina {exercise.page} · {exercise.topic}
+          Pagina {exercise.page} &middot; {exercise.topic}
         </div>
 
         {/* Titel */}
