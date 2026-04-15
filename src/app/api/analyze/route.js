@@ -1,0 +1,111 @@
+// ── API Route: /api/analyze ─────────────────────────────────────────
+// Ontvangt geëxtraheerde PDF-tekst en stuurt die naar Groq API
+// (OpenAI-compatible) om oefeningen te herkennen en te classificeren.
+//
+// Als er geen GROQ_API_KEY is geconfigureerd, returnt de route
+// een foutmelding zodat de client naar demo-modus kan switchen.
+
+import { NextResponse } from 'next/server';
+import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
+
+export async function POST(request) {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'NO_API_KEY', message: 'Geen Groq API key geconfigureerd. App draait in demo-modus.' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const { pages } = await request.json();
+
+    if (!pages || !Array.isArray(pages) || pages.length === 0) {
+      return NextResponse.json(
+        { error: 'NO_PAGES', message: 'Geen pagina-tekst ontvangen.' },
+        { status: 400 }
+      );
+    }
+
+    // Combineer alle pagina-teksten met paginanummers
+    const combinedText = pages
+      .map(p => `--- PAGINA ${p.page} ---\n${p.text}`)
+      .join('\n\n');
+
+    // Groq model – llama-3.3-70b-versatile is snel en gratis tier compatible
+    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.3,
+        max_tokens: 4096,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Groq API error:', response.status, errorData);
+      return NextResponse.json(
+        { error: 'API_ERROR', message: `Groq API fout (${response.status}): ${errorData?.error?.message || 'Onbekende fout'}` },
+        { status: 500 }
+      );
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return NextResponse.json(
+        { error: 'NO_RESPONSE', message: 'Geen antwoord van AI ontvangen.' },
+        { status: 500 }
+      );
+    }
+
+    // Parse JSON uit het antwoord (strip eventuele markdown code blocks)
+    let exercises;
+    try {
+      const cleaned = content
+        .replace(/^```json\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+      exercises = JSON.parse(cleaned);
+    } catch (e) {
+      console.error('JSON parse error:', e.message, '\nRaw content:', content);
+      return NextResponse.json(
+        { error: 'PARSE_ERROR', message: 'AI-antwoord kon niet worden geparsed als JSON.' },
+        { status: 500 }
+      );
+    }
+
+    // Voeg page-nummers toe als ze er niet zijn en geef IDs
+    const enriched = exercises.map((ex, i) => ({
+      ...ex,
+      id: i + 1,
+      page: ex.page || pages[0]?.page || 1,
+      status: null,
+    }));
+
+    return NextResponse.json({ exercises: enriched, mode: 'ai' });
+
+  } catch (error) {
+    console.error('Analyze route error:', error);
+    return NextResponse.json(
+      { error: 'INTERNAL', message: error.message },
+      { status: 500 }
+    );
+  }
+}

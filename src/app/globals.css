@@ -1,0 +1,25 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #F8F3FB;
+  color: #2C1340;
+}
+
+button { transition: filter 0.15s; cursor: pointer; }
+button:hover { filter: brightness(0.91); }
+button:disabled { cursor: default; opacity: 0.5; }
+
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes fadeIn  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.fade { animation: fadeIn 0.3s ease; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: #C8A8D8; border-radius: 3px; }
+
+/* Drag-over state */
+.drop-active {
+  border-color: #2DAA4F !important;
+  background: #E8F7ED !important;
+}
