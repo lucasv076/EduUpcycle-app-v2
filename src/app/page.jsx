@@ -308,94 +308,68 @@ export default function EduUpcycleApp() {
       setProcMsg(`${allPages.length} pagina's geëxtraheerd`);
       await new Promise(r => setTimeout(r, 400));
 
-      // Stap 3: AI analyse
+      // Stap 3: AI analyse — in chunks van CHUNK_SIZE pagina's
+      // Grote werkboeken (rekenen/taal/lezen) bevatten honderden pagina's;
+      // één grote request zou de Groq context-limiet overschrijden.
+      const CHUNK_SIZE = 8;
+
+      // Filter pagina's zonder bruikbare tekst (lege pagina's, omslagen, etc.)
+      const textPages = allPages.filter(p => p.text && p.text.trim().length > 30);
+      const sourcePages = textPages.length > 0 ? textPages : allPages;
+
+      const pageChunks = [];
+      for (let i = 0; i < sourcePages.length; i += CHUNK_SIZE) {
+        pageChunks.push(sourcePages.slice(i, i + CHUNK_SIZE));
+      }
+      if (pageChunks.length === 0) pageChunks.push(allPages.slice(0, CHUNK_SIZE));
+
       setProcIdx(2);
-      setProcMsg('Oefeningen herkennen met AI…');
+      let allExercises = [];
+      let resultMode = 'ai';
 
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pages: allPages.map(p => ({ page: p.page, text: p.text, fileName: p.fileName })),
-        }),
-      });
+      for (let ci = 0; ci < pageChunks.length; ci++) {
+        const chunk = pageChunks[ci];
+        const p1 = chunk[0].page;
+        const p2 = chunk[chunk.length - 1].page;
+        setProcMsg(`AI analyseert pagina's ${p1}–${p2} (deel ${ci + 1} van ${pageChunks.length})…`);
 
-      let result;
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        if (err.error === 'NO_API_KEY') {
-          // Geen API key → demo-modus
-          setProcMsg('Geen API key gevonden — demo-modus laden…');
-          await new Promise(r => setTimeout(r, 600));
-          result = { exercises: DEMO_EXERCISES, mode: 'demo' };
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pages: chunk.map(p => ({ page: p.page, text: p.text, fileName: p.fileName })),
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          if (err.error === 'NO_API_KEY') {
+            // Geen API key → demo-modus (stop chunking)
+            setProcMsg('Geen API key gevonden — demo-modus laden…');
+            await new Promise(r => setTimeout(r, 600));
+            allExercises = DEMO_EXERCISES;
+            resultMode = 'demo';
+            break;
+          } else {
+            throw new Error(err.message || `API fout bij pagina's ${p1}–${p2}`);
+          }
         } else {
-          throw new Error(err.message || 'API fout');
+          const chunkResult = await response.json();
+          allExercises.push(...(chunkResult.exercises || []));
+          resultMode = chunkResult.mode || 'ai';
         }
-      } else {
-        result = await response.json();
       }
 
       setProcIdx(3);
-      setProcMsg(`${result.exercises.length} oefeningen gevonden!`);
+      setProcMsg(`${allExercises.length} oefeningen gevonden!`);
       await new Promise(r => setTimeout(r, 600));
 
       // Klaar → naar review stap
       setProcIdx(4);
-      setExercises(result.exercises.map((ex, i) => ({ ...ex, id: i + 1, status: null })));
-      setMode(result.mode);
+      setExercises(allExercises.map((ex, i) => ({ ...ex, id: i + 1, status: null })));
+      setMode(resultMode);
       setSelectedId(1);
       setStep(2);
-
-    } catch (err) {
-      console.error('Process error:', err);
-      setError(`Fout bij verwerking: ${err.message}`);
-      setStep(0);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // ── Exercise actions ────────────────────────────────────────────────
-  const doStatus = (id, status) => {
-    setExercises(ex => ex.map(e => e.id === id ? { ...e, status } : e));
-    const next = exercises.find(e => e.status === null && e.id !== id);
-    if (next) setSelectedId(next.id);
-  };
-
-  const doSaveType = () => {
-    setExercises(ex => ex.map(e => e.id === selectedId ? { ...e, type: editedType } : e));
-    setEditingType(false);
-  };
-
-  // ── Opslaan naar Supabase ───────────────────────────────────────────
-  const doSave = async () => {
-    const approved = exercises.filter(e => e.status === 'approved');
-    if (approved.length === 0) { setStep(3); return; }
-
-    setSaving(true);
-    try {
-      const res = await fetch('/api/save-exercises', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ exercises: approved }),
-      });
-      const data = await res.json();
-
-      if (data.saved?.length > 0) {
-        // Supabase werkt → sla links op voor de student-pagina
-        setSavedLinks(data.saved.map(ex => ({ id: ex.id, title: ex.title })));
-      } else {
-        // Supabase niet geconfigureerd of fout → alleen JSON export beschikbaar
-        setSavedLinks([]);
-      }
-    } catch (err) {
-      console.warn('Supabase opslaan mislukt:', err.message);
-      setSavedLinks([]);
-    } finally {
-      setSaving(false);
-      setStep(3);
-    }
-  };
 
   // ── Drop handlers ───────────────────────────────────────────────────
   const onDrop = useCallback((e) => {
