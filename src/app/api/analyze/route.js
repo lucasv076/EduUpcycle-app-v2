@@ -34,7 +34,7 @@ export async function POST(request) {
       .map(p => `--- PAGINA ${p.page} ---\n${p.text.slice(0, MAX_CHARS_PER_PAGE)}`)
       .join('\n\n');
 
-    / Gemini 2.5 Flash via OpenAI-compatible endpoint
+    // Gemini 2.5 Flash via OpenAI-compatible endpoint
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
