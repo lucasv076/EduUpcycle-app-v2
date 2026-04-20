@@ -18,6 +18,7 @@ export async function POST(request) {
   try {
   
     const { pages, isScanned = false } = await request.json();
+    const { pages } = await request.json();
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
       return NextResponse.json(
@@ -26,21 +27,17 @@ export async function POST(request) {
       );
     }
 
-    // Tekst per pagina afkappen zodat de context niet overloopt
-    const MAX_CHARS_PER_PAGE = 2000;
-    const combinedText = pages
-      .map(p => `--- PAGINA ${p.page} ---\n${(p.text || '').slice(0, MAX_CHARS_PER_PAGE)}`)
-      .join('\n\n');
-
-    // Gemini 2.5 Flash via OpenAI-compatible endpoint
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+    const useVision = pages.some(p => p.image);
 
     // Bouw de user-message op: vision (gescand) of tekst
     let userContent;
     if (isScanned && pages.some(p => p.image)) {
       // Vision-modus: stuur pagina-afbeeldingen naar Gemini
+    if (useVision) {
       userContent = [
         { type: 'text', text: 'Analyseer de volgende werkboekpagina\'s uit een Zwijsen-werkboek. Identificeer alle oefeningen en opdrachten.' },
+        { type: 'text', text: "Analyseer de volgende werkboekpagina's uit een Zwijsen-werkboek. Identificeer alle oefeningen en opdrachten." },
         ...pages.flatMap(p => [
           { type: 'text', text: `--- PAGINA ${p.page} ---` },
           { type: 'image_url', image_url: { url: p.image } },
@@ -48,6 +45,12 @@ export async function POST(request) {
       ];
     } else {
       // Tekst-modus
+      const MAX_CHARS_PER_PAGE = 2000;
+      const combinedText = pages
+        .map(p => `--- PAGINA ${p.page} ---\n${(p.text || '').slice(0, MAX_CHARS_PER_PAGE)}`)
+        .join('\n\n');
+      userContent = `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`;
+    }
       
       userContent = `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`;
     }
