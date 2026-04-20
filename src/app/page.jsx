@@ -344,11 +344,17 @@ export default function EduUpcycleApp() {
 
         setProcMsg(`AI analyseert pagina's ${p1}–${p2} (deel ${ci + 1} van ${pageChunks.length})…`);
 
-        const response = await fetch('/api/analyze', {
+                const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            pages: chunk.map(p => ({ page: p.page, text: p.text, fileName: p.fileName })),
+            isScanned,
+            pages: chunk.map(p => ({
+              page: p.page,
+              text: p.text,
+              fileName: p.fileName,
+              ...(isScanned && { image: p.apiImageDataUrl }),
+            })),
           }),
         });
 
