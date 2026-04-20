@@ -29,8 +29,8 @@ export async function POST(request) {
     }
 
     // Combineer alle pagina-teksten met paginanummers
-    const combinedText = pages
-      .map(p => `--- PAGINA ${p.page} ---\n${p.text}`)
+    const MAX_CHARS_PER_PAGE = 1200;
+      .map(p => `--- PAGINA ${p.page} ---\n${p.text.slice(0, MAX_CHARS_PER_PAGE)}`)
       .join('\n\n');
 
     // Groq model – llama-3.3-70b-versatile is snel en gratis tier compatible
@@ -45,7 +45,7 @@ export async function POST(request) {
       body: JSON.stringify({
         model,
         temperature: 0.3,
-        max_tokens: 8192,
+        max_tokens: 4096,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
