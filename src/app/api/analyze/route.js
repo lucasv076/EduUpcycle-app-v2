@@ -9,11 +9,11 @@ import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
 
 export async function POST(request) {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'NO_API_KEY', message: 'Geen Groq API key geconfigureerd. App draait in demo-modus.' },
+      { error: 'NO_API_KEY', message: 'Geen Gemini API key geconfigureerd. App draait in demo-modus.' },
       { status: 400 }
     );
   }
@@ -34,10 +34,10 @@ export async function POST(request) {
       .map(p => `--- PAGINA ${p.page} ---\n${p.text.slice(0, MAX_CHARS_PER_PAGE)}`)
       .join('\n\n');
 
-    // Groq model – llama-3.3-70b-versatile is snel en gratis tier compatible
-    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    / Gemini 2.5 Flash via OpenAI-compatible endpoint
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
