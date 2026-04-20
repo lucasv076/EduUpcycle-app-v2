@@ -30,6 +30,7 @@ export async function POST(request) {
 
     // Combineer alle pagina-teksten met paginanummers
     const MAX_CHARS_PER_PAGE = 1200;
+    const combinedText = pages
       .map(p => `--- PAGINA ${p.page} ---\n${p.text.slice(0, MAX_CHARS_PER_PAGE)}`)
       .join('\n\n');
 
