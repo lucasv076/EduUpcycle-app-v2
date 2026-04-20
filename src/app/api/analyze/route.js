@@ -40,7 +40,7 @@ export async function POST(request) {
        const requestBody = JSON.stringify({
       model,
       temperature: 0.3,
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {
@@ -100,19 +100,37 @@ for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
     }
 
     // Parse JSON uit het antwoord (strip eventuele markdown code blocks)
+      // Parse JSON uit het antwoord (strip eventuele markdown code blocks)
+    // Parse JSON uit het antwoord — probeer meerdere strategieën
     let exercises;
     try {
       const cleaned = content
+      // Strategie 1: strip markdown code blocks
+      let cleaned = content
         .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
         .replace(/```\s*$/i, '')
         .trim();
+
+      // Strategie 2: pak de eerste [ ... ] array uit de tekst
+      if (!cleaned.startsWith('[')) {
+        const match = cleaned.match(/\[[\s\S]*\]/);
+        if (match) cleaned = match[0];
+      }
+
       exercises = JSON.parse(cleaned);
+
+      // Zorg dat het altijd een array is
+      if (!Array.isArray(exercises)) exercises = [exercises];
     } catch (e) {
       console.error('JSON parse error:', e.message, '\nRaw content:', content);
       return NextResponse.json(
         { error: 'PARSE_ERROR', message: 'AI-antwoord kon niet worden geparsed als JSON.' },
         { status: 500 }
       );
+      console.error('JSON parse error:', e.message, '\nRaw content:', content.slice(0, 500));
+      // Val terug op lege array zodat de app niet crasht
+      exercises = [];
     }
 
     // Voeg page-nummers toe als ze er niet zijn en geef IDs
