@@ -65,6 +65,12 @@ export async function POST(request) {
       let msg = '';
       try { msg = JSON.parse(rawText)?.error?.message || ''; } catch {}
       console.error('Gemini API error:', response.status, rawText.slice(0, 300));
+      if (response.status === 429) {
+        return NextResponse.json(
+          { error: 'RATE_LIMIT', message: 'Gemini rate limit bereikt — even wachten.' },
+          { status: 500 }
+        );
+      }
       const isContextError = response.status === 400 && (
         msg.includes('context') || msg.includes('token') || msg.includes('length')
       );
