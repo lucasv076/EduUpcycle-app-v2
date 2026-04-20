@@ -308,14 +308,18 @@ export default function EduUpcycleApp() {
       setProcMsg(`${allPages.length} pagina's geëxtraheerd`);
       await new Promise(r => setTimeout(r, 400));
 
-      // Stap 3: AI analyse — in chunks van CHUNK_SIZE pagina's
-      // Grote werkboeken (rekenen/taal/lezen) bevatten honderden pagina's;
-      // één grote request zou de Groq context-limiet overschrijden.
-      const CHUNK_SIZE = 50;
-
-      // Filter pagina's zonder bruikbare tekst (lege pagina's, omslagen, etc.)
+      // Stap 3: AI analyse
       const textPages = allPages.filter(p => p.text && p.text.trim().length > 30);
-      const sourcePages = textPages.length > 0 ? textPages : allPages;
+      const isScanned = textPages.length < allPages.length * 0.3;
+
+      // Gescande PDFs: vision-modus met kleinere chunks; tekst-PDFs: grote chunks
+      const CHUNK_SIZE = isScanned ? 4 : 50;
+      const sourcePages = isScanned ? allPages : (textPages.length > 0 ? textPages : allPages);
+
+      if (isScanned) {
+        setProcMsg('Gescande PDF gedetecteerd — vision-modus actief…');
+        await new Promise(r => setTimeout(r, 800));
+      }
 
       const pageChunks = [];
       for (let i = 0; i < sourcePages.length; i += CHUNK_SIZE) {
@@ -337,14 +341,13 @@ export default function EduUpcycleApp() {
         const p2 = chunk[chunk.length - 1].page;
 
         if (ci > 0) {
-          setProcMsg(`Even wachten (rate limit)… pagina's ${p1}–${p2} volgt zo`);
           setProcMsg(`Even wachten… pagina's ${p1}–${p2} volgt zo`);
           await new Promise(r => setTimeout(r, CHUNK_DELAY_MS));
         }
 
         setProcMsg(`AI analyseert pagina's ${p1}–${p2} (deel ${ci + 1} van ${pageChunks.length})…`);
 
-                const response = await fetch('/api/analyze', {
+        const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
