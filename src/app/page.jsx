@@ -308,18 +308,10 @@ export default function EduUpcycleApp() {
       setProcMsg(`${allPages.length} pagina's geëxtraheerd`);
       await new Promise(r => setTimeout(r, 400));
 
-      // Stap 3: AI analyse
-      const textPages = allPages.filter(p => p.text && p.text.trim().length > 30);
-      const isScanned = textPages.length < allPages.length * 0.3;
-
-      // Gescande PDFs: vision-modus met kleinere chunks; tekst-PDFs: grote chunks
-      const CHUNK_SIZE = isScanned ? 4 : 50;
-      const sourcePages = isScanned ? allPages : (textPages.length > 0 ? textPages : allPages);
-
-      if (isScanned) {
-        setProcMsg('Gescande PDF gedetecteerd — vision-modus actief…');
-        await new Promise(r => setTimeout(r, 800));
-      }
+      // Stap 3: AI analyse — altijd vision-modus zodat Gemini de pagina echt ziet
+      // CHUNK_SIZE=3: houdt request-grootte klein voor gratis tier
+      const CHUNK_SIZE = 3;
+      const sourcePages = allPages;
 
       const pageChunks = [];
       for (let i = 0; i < sourcePages.length; i += CHUNK_SIZE) {
@@ -351,12 +343,11 @@ export default function EduUpcycleApp() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            isScanned,
             pages: chunk.map(p => ({
               page: p.page,
               text: p.text,
               fileName: p.fileName,
-              ...(isScanned && { image: p.apiImageDataUrl }),
+              image: p.apiImageDataUrl,
             })),
           }),
         });
