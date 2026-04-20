@@ -1,6 +1,9 @@
 // ── API Route: /api/analyze ─────────────────────────────────────────
-// Ontvangt geëxtraheerde PDF-tekst en stuurt die naar Groq API
-// (OpenAI-compatible) om oefeningen te herkennen en te classificeren.
+// Ontvangt geëxtraheerde PDF-tekst en stuurt die naar de Gemini API
+// (OpenAI-compatible endpoint) om oefeningen te herkennen en te classificeren.
+//
+// Als er geen GEMINI_API_KEY is geconfigureerd, returnt de route
+// een foutmelding zodat de client naar demo-modus kan switchen.
 
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
@@ -16,8 +19,6 @@ export async function POST(request) {
   }
 
   try {
-  
-    const { pages, isScanned = false } = await request.json();
     const { pages } = await request.json();
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
@@ -30,13 +31,9 @@ export async function POST(request) {
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
     const useVision = pages.some(p => p.image);
 
-    // Bouw de user-message op: vision (gescand) of tekst
     let userContent;
-    if (isScanned && pages.some(p => p.image)) {
-      // Vision-modus: stuur pagina-afbeeldingen naar Gemini
     if (useVision) {
       userContent = [
-        { type: 'text', text: 'Analyseer de volgende werkboekpagina\'s uit een Zwijsen-werkboek. Identificeer alle oefeningen en opdrachten.' },
         { type: 'text', text: "Analyseer de volgende werkboekpagina's uit een Zwijsen-werkboek. Identificeer alle oefeningen en opdrachten." },
         ...pages.flatMap(p => [
           { type: 'text', text: `--- PAGINA ${p.page} ---` },
@@ -44,14 +41,10 @@ export async function POST(request) {
         ]),
       ];
     } else {
-      // Tekst-modus
       const MAX_CHARS_PER_PAGE = 2000;
       const combinedText = pages
         .map(p => `--- PAGINA ${p.page} ---\n${(p.text || '').slice(0, MAX_CHARS_PER_PAGE)}`)
         .join('\n\n');
-      userContent = `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`;
-    }
-      
       userContent = `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`;
     }
 
@@ -61,22 +54,20 @@ export async function POST(request) {
       max_tokens: 8192,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-      
         { role: 'user', content: userContent },
       ],
     });
 
     // Bij 503 (overbelast) tot 4x opnieuw proberen met oplopende wachttijd
-    const retryDelays = [3000, 6000, 12000, 20000];
     let response;
-    for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+    const retryDelays = [3000, 6000, 12000, 20000];
+    for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
       response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: requestBody,
       });
-      if (response.status !== 503) break;
-      if (attempt === retryDelays.length - 1) break;
+      if (response.status !== 503 || attempt === retryDelays.length) break;
       await new Promise(r => setTimeout(r, retryDelays[attempt]));
     }
 
@@ -118,6 +109,7 @@ export async function POST(request) {
     // Parse JSON uit het antwoord — probeer meerdere strategieën
     let exercises;
     try {
+      // Strategie 1: strip markdown code blocks
       let cleaned = content
         .replace(/^```json\s*/i, '')
         .replace(/^```\s*/i, '')
