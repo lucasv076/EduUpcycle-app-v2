@@ -35,32 +35,36 @@ export async function POST(request) {
       .join('\n\n');
 
     // Gemini 2.5 Flash via OpenAI-compatible endpoint
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-04-17';
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.3,
-        max_tokens: 4096,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`,
-          },
-        ],
-      }),
+       const requestBody = JSON.stringify({
+      model,
+      temperature: 0.3,
+      max_tokens: 4096,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`,
+        },
+      ],
     });
-
+  // Bij 503 (overbelast) één keer opnieuw proberen na korte wachttijd
+    let response;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+      response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: requestBody,
+      });
+      if (response.status !== 503) break;
+    }
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Gemini API error:', response.status, errorData);
-      const msg = errorData?.error?.message || '';
+      const rawText = await response.text().catch(() => '');
+      let msg = '';
+      try { msg = JSON.parse(rawText)?.error?.message || ''; } catch {}
+      console.error('Gemini API error:', response.status, rawText.slice(0, 300));
       const isContextError = response.status === 400 && (
         msg.includes('context') || msg.includes('token') || msg.includes('length')
       );
@@ -69,7 +73,7 @@ export async function POST(request) {
           error: isContextError ? 'CONTEXT_TOO_LONG' : 'API_ERROR',
           message: isContextError
             ? 'Tekst te lang voor AI — stuur minder pagina\'s per keer.'
-            : `Gemini API fout (${response.status}): ${msg || 'Onbekende fout'}`,
+            : `Gemini API fout (${response.status}): ${msg || rawText.slice(0, 120) || 'Onbekende fout'}`,
         },
         { status: 500 }
       );
