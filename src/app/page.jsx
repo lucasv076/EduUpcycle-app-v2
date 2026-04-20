@@ -402,7 +402,12 @@ export default function EduUpcycleApp() {
 
     } catch (err) {
       console.error('Process error:', err);
-      setError(`Fout bij verwerking: ${err.message}`);
+      const message = String(err?.message || 'Onbekende fout');
+      if (message.includes('PDF_JS_LOAD_FAILED')) {
+        setError('PDF-engine kon niet geladen worden. Ververs de pagina (Ctrl+F5) en probeer opnieuw.');
+      } else {
+        setError(`Fout bij verwerking: ${message}`);
+      }
       setStep(0);
     } finally {
       setUploading(false);
