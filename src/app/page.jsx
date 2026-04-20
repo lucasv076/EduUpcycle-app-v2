@@ -327,7 +327,9 @@ export default function EduUpcycleApp() {
       let allExercises = [];
       let resultMode = 'ai';
 
+            // 5 seconden wachten tussen chunks: gratis tier = max 15 req/min
       const CHUNK_DELAY_MS = 5000;
+      let rateLimitHits = 0;
 
       for (let ci = 0; ci < pageChunks.length; ci++) {
         const chunk = pageChunks[ci];
@@ -336,6 +338,7 @@ export default function EduUpcycleApp() {
 
         if (ci > 0) {
           setProcMsg(`Even wachten (rate limit)… pagina's ${p1}–${p2} volgt zo`);
+          setProcMsg(`Even wachten… pagina's ${p1}–${p2} volgt zo`);
           await new Promise(r => setTimeout(r, CHUNK_DELAY_MS));
         }
 
@@ -358,24 +361,34 @@ export default function EduUpcycleApp() {
             resultMode = 'demo';
             break;
           } else if (err.error === 'CONTEXT_TOO_LONG') {
-            // Pagina's met te veel tekst overslaan en doorgaan
             setProcMsg(`Pagina's ${p1}–${p2} te lang voor AI — overgeslagen`);
             await new Promise(r => setTimeout(r, 800));
           } else if (err.error === 'RATE_LIMIT') {
             // Extra wachttijd en opnieuw proberen
             setProcMsg(`Rate limit bereikt — 15 seconden wachten…`);
             await new Promise(r => setTimeout(r, 15000));
+            rateLimitHits++;
+            if (rateLimitHits >= 3) {
+              // Quota op — val terug op demo-modus
+              setProcMsg('Dagelijkse quota bereikt — demo-modus laden…');
+              await new Promise(r => setTimeout(r, 800));
+              allExercises = DEMO_EXERCISES;
+              resultMode = 'demo';
+              break;
+            }
+            setProcMsg(`Rate limit — 20 seconden wachten (${rateLimitHits}/3)…`);
+            await new Promise(r => setTimeout(r, 20000));
             ci--; // zelfde chunk opnieuw
           } else {
             throw new Error(err.message || `API fout bij pagina's ${p1}–${p2}`);
           }
         } else {
+          rateLimitHits = 0; // succesvolle aanroep reset de teller
           const chunkResult = await response.json();
           allExercises.push(...(chunkResult.exercises || []));
           resultMode = chunkResult.mode || 'ai';
         }
       }
-
       setProcIdx(3);
       setProcMsg(`${allExercises.length} oefeningen gevonden!`);
       await new Promise(r => setTimeout(r, 600));
