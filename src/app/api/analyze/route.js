@@ -35,7 +35,7 @@ export async function POST(request) {
       .join('\n\n');
 
     // Gemini 2.5 Flash via OpenAI-compatible endpoint
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-04-17';
 
        const requestBody = JSON.stringify({
       model,
