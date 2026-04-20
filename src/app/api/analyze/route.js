@@ -49,16 +49,21 @@ export async function POST(request) {
         },
       ],
     });
-  // Bij 503 (overbelast) één keer opnieuw proberen na korte wachttijd
+     // Bij 503 (overbelast) één keer opnieuw proberen na korte wachttijd
+    // Bij 503 (overbelast) tot 4x opnieuw proberen met oplopende wachttijd
     let response;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+    const retryDelays = [3000, 6000, 12000, 20000];
+    for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
       response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: requestBody,
       });
       if (response.status !== 503) break;
+      if (response.status !== 503 || attempt === retryDelays.length) break;
+      await new Promise(r => setTimeout(r, retryDelays[attempt]));
     }
     if (!response.ok) {
       const rawText = await response.text().catch(() => '');
