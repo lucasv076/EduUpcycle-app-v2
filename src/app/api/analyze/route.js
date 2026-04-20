@@ -29,13 +29,13 @@ export async function POST(request) {
     }
 
     // Combineer alle pagina-teksten met paginanummers
-    const MAX_CHARS_PER_PAGE = 1200;
+    const MAX_CHARS_PER_PAGE = 2000;
     const combinedText = pages
       .map(p => `--- PAGINA ${p.page} ---\n${p.text.slice(0, MAX_CHARS_PER_PAGE)}`)
       .join('\n\n');
 
     // Gemini 2.5 Flash via OpenAI-compatible endpoint
-    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
        const requestBody = JSON.stringify({
       model,
