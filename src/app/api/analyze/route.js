@@ -59,7 +59,7 @@ export async function POST(request) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Groq API error:', response.status, errorData);
+      console.error('Gemini API error:', response.status, errorData);
       const msg = errorData?.error?.message || '';
       const isContextError = response.status === 400 && (
         msg.includes('context') || msg.includes('token') || msg.includes('length')
@@ -69,7 +69,7 @@ export async function POST(request) {
           error: isContextError ? 'CONTEXT_TOO_LONG' : 'API_ERROR',
           message: isContextError
             ? 'Tekst te lang voor AI — stuur minder pagina\'s per keer.'
-            : `Groq API fout (${response.status}): ${msg || 'Onbekende fout'}`,
+            : `Gemini API fout (${response.status}): ${msg || 'Onbekende fout'}`,
         },
         { status: 500 }
       );
