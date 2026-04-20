@@ -1,12 +1,11 @@
 // ── API Route: /api/analyze ─────────────────────────────────────────
-// Ontvangt geëxtraheerde PDF-tekst en stuurt die naar de Gemini API
-// (OpenAI-compatible endpoint) om oefeningen te herkennen en te classificeren.
-//
-// Als er geen GEMINI_API_KEY is geconfigureerd, returnt de route
-// een foutmelding zodat de client naar demo-modus kan switchen.
+// Gebruikt de native Gemini generateContent API (niet de OAI-compat laag)
+// zodat multimodale afbeeldingen betrouwbaar werken via inline_data.
 
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
+
+export const maxDuration = 60;
 
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -29,42 +28,43 @@ export async function POST(request) {
     }
 
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-    const useVision = pages.some(p => p.image);
 
-    let userContent;
-    if (useVision) {
-      userContent = [
-        { type: 'text', text: "Analyseer de volgende werkboekpagina's uit een Zwijsen-werkboek. Identificeer alle oefeningen en opdrachten." },
-        ...pages.flatMap(p => [
-          { type: 'text', text: `--- PAGINA ${p.page} ---` },
-          { type: 'image_url', image_url: { url: p.image } },
-        ]),
-      ];
-    } else {
-      const MAX_CHARS_PER_PAGE = 2000;
-      const combinedText = pages
-        .map(p => `--- PAGINA ${p.page} ---\n${(p.text || '').slice(0, MAX_CHARS_PER_PAGE)}`)
-        .join('\n\n');
-      userContent = `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`;
+    // Bouw de parts op: tekst + afbeeldingen per pagina
+    const parts = [
+      { text: "Analyseer de volgende werkboekpagina's uit een Zwijsen-werkboek en identificeer ALLE oefeningen en opdrachten. Lever het resultaat als JSON-array precies zoals beschreven." },
+    ];
+
+    for (const p of pages) {
+      parts.push({ text: `--- PAGINA ${p.page} ---` });
+
+      if (p.image && p.image.startsWith('data:')) {
+        // Haal mime-type en base64-data op uit de data-URL
+        const [meta, b64] = p.image.split(',');
+        const mime = meta.replace('data:', '').replace(';base64', '');
+        parts.push({ inline_data: { mime_type: mime, data: b64 } });
+      } else if (p.text) {
+        parts.push({ text: p.text.slice(0, 3000) });
+      }
     }
 
     const requestBody = JSON.stringify({
-      model,
-      temperature: 0.3,
-      max_tokens: 8192,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userContent },
-      ],
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 8192,
+      },
     });
 
-    // Bij 503 (overbelast) tot 4x opnieuw proberen met oplopende wachttijd
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    // Bij 503 tot 4x opnieuw proberen met oplopende wachttijd
     let response;
     const retryDelays = [3000, 6000, 12000, 20000];
     for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
-      response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+      response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        headers: { 'Content-Type': 'application/json' },
         body: requestBody,
       });
       if (response.status !== 503 || attempt === retryDelays.length) break;
@@ -75,7 +75,8 @@ export async function POST(request) {
       const rawText = await response.text().catch(() => '');
       let msg = '';
       try { msg = JSON.parse(rawText)?.error?.message || ''; } catch {}
-      console.error('Gemini API error:', response.status, rawText.slice(0, 300));
+      console.error('Gemini API error:', response.status, rawText.slice(0, 500));
+
       if (response.status === 429) {
         return NextResponse.json(
           { error: 'RATE_LIMIT', message: 'Gemini rate limit bereikt — even wachten.' },
@@ -89,50 +90,47 @@ export async function POST(request) {
         {
           error: isContextError ? 'CONTEXT_TOO_LONG' : 'API_ERROR',
           message: isContextError
-            ? 'Tekst te lang voor AI — stuur minder pagina\'s per keer.'
-            : `Gemini API fout (${response.status}): ${msg || rawText.slice(0, 120) || 'Onbekende fout'}`,
+            ? 'Te veel pagina\'s tegelijk — stuur minder pagina\'s per keer.'
+            : `Gemini API fout (${response.status}): ${msg || rawText.slice(0, 200) || 'Onbekende fout'}`,
         },
         { status: 500 }
       );
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    // Native API response: candidates[0].content.parts[0].text
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
+      const reason = data.candidates?.[0]?.finishReason || 'onbekend';
+      console.error('Geen content in Gemini response:', JSON.stringify(data).slice(0, 300));
       return NextResponse.json(
-        { error: 'NO_RESPONSE', message: 'Geen antwoord van AI ontvangen.' },
+        { error: 'NO_RESPONSE', message: `Geen antwoord van AI (reden: ${reason}).` },
         { status: 500 }
       );
     }
 
-    // Parse JSON uit het antwoord — probeer meerdere strategieën
+    // Parse JSON — meerdere strategieën
     let exercises;
     try {
-      // Strategie 1: strip markdown code blocks
       let cleaned = content
         .replace(/^```json\s*/i, '')
         .replace(/^```\s*/i, '')
         .replace(/```\s*$/i, '')
         .trim();
 
-      // Strategie 2: pak de eerste [ ... ] array uit de tekst
       if (!cleaned.startsWith('[')) {
         const match = cleaned.match(/\[[\s\S]*\]/);
         if (match) cleaned = match[0];
       }
 
       exercises = JSON.parse(cleaned);
-
-      // Zorg dat het altijd een array is
       if (!Array.isArray(exercises)) exercises = [exercises];
     } catch (e) {
-      console.error('JSON parse error:', e.message, '\nRaw content:', content.slice(0, 500));
-      // Val terug op lege array zodat de app niet crasht
+      console.error('JSON parse mislukt:', e.message, '\nRaw:', content.slice(0, 500));
       exercises = [];
     }
 
-    // Voeg page-nummers toe als ze er niet zijn en geef IDs
     const enriched = exercises.map((ex, i) => ({
       ...ex,
       id: i + 1,
