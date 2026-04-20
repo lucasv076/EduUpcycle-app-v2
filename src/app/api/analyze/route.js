@@ -28,7 +28,7 @@ export async function POST(request) {
       );
     }
 
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     const useVision = pages.some(p => p.image);
 
     let userContent;
