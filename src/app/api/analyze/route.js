@@ -1,9 +1,6 @@
 // ── API Route: /api/analyze ─────────────────────────────────────────
 // Ontvangt geëxtraheerde PDF-tekst en stuurt die naar Groq API
 // (OpenAI-compatible) om oefeningen te herkennen en te classificeren.
-//
-// Als er geen GROQ_API_KEY is geconfigureerd, returnt de route
-// een foutmelding zodat de client naar demo-modus kan switchen.
 
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
@@ -37,7 +34,7 @@ export async function POST(request) {
     // Gemini 2.5 Flash via OpenAI-compatible endpoint
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
-       const requestBody = JSON.stringify({
+    const requestBody = JSON.stringify({
       model,
       temperature: 0.3,
       max_tokens: 8192,
@@ -49,21 +46,21 @@ export async function POST(request) {
         },
       ],
     });
-     // Bij 503 (overbelast) één keer opnieuw proberen na korte wachttijd
+
     // Bij 503 (overbelast) tot 4x opnieuw proberen met oplopende wachttijd
-    
     const retryDelays = [3000, 6000, 12000, 20000];
-let response;
-for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
-  response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: requestBody,
-  });
-  if (response.status !== 503) break;
-  if (attempt === retryDelays.length) break;
-  await new Promise(r => setTimeout(r, retryDelays[attempt]));
-}
+    let response;
+    for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+      response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: requestBody,
+      });
+      if (response.status !== 503) break;
+      if (attempt === retryDelays.length - 1) break;
+      await new Promise(r => setTimeout(r, retryDelays[attempt]));
+    }
+
     if (!response.ok) {
       const rawText = await response.text().catch(() => '');
       let msg = '';
@@ -99,13 +96,9 @@ for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
       );
     }
 
-    // Parse JSON uit het antwoord (strip eventuele markdown code blocks)
-      // Parse JSON uit het antwoord (strip eventuele markdown code blocks)
     // Parse JSON uit het antwoord — probeer meerdere strategieën
     let exercises;
     try {
-      const cleaned = content
-      // Strategie 1: strip markdown code blocks
       let cleaned = content
         .replace(/^```json\s*/i, '')
         .replace(/^```\s*/i, '')
@@ -123,11 +116,6 @@ for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
       // Zorg dat het altijd een array is
       if (!Array.isArray(exercises)) exercises = [exercises];
     } catch (e) {
-      console.error('JSON parse error:', e.message, '\nRaw content:', content);
-      return NextResponse.json(
-        { error: 'PARSE_ERROR', message: 'AI-antwoord kon niet worden geparsed als JSON.' },
-        { status: 500 }
-      );
       console.error('JSON parse error:', e.message, '\nRaw content:', content.slice(0, 500));
       // Val terug op lege array zodat de app niet crasht
       exercises = [];
