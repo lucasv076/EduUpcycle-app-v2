@@ -20,7 +20,10 @@ Analyseer de volgende PDF-pagina tekst en identificeer ALLE afzonderlijke oefeni
 9. **variants**: Twee varianten:
    - Eén MAKKELIJKER variant (label: "Makkelijker")
    - Eén MOEILIJKER variant (label: "Moeilijker")
-   Elke variant bevat een compleet geformuleerde oefeningstekst.
+   Elke variant bevat:
+   - **text**: de volledige oefeningstekst
+   - **answer**: het correcte antwoord (voor Invulvraag/Meerkeuze: het exacte antwoord; voor Open vraag: een voorbeeldantwoord; voor Tekenopgave/Manipulatieopdracht: "n.v.t.")
+   - **options**: alleen bij Meerkeuze — een array van 4 antwoordopties als strings (waaronder het correcte antwoord)
 
 ## Regels
 - Detecteer OOK oefeningen die fysiek materiaal vereisen (knippen, plakken, tekenen) — markeer deze met lagere confidence
@@ -42,8 +45,8 @@ Antwoord ALLEEN met een JSON-array. Geen tekst ervoor of erna.
     "format": "...",
     "note": "...",
     "variants": [
-      { "level": "Makkelijker", "text": "..." },
-      { "level": "Moeilijker", "text": "..." }
+      { "level": "Makkelijker", "text": "...", "answer": "...", "options": ["...", "...", "...", "..."] },
+      { "level": "Moeilijker", "text": "...", "answer": "...", "options": ["...", "...", "...", "..."] }
     ]
   }
 ]`;
