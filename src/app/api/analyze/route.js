@@ -17,7 +17,7 @@ export async function POST(request) {
 
   try {
   
-    const { pages, isScanned } = await request.json();
+    const { pages, isScanned = false } = await request.json();
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
       return NextResponse.json(
@@ -29,7 +29,7 @@ export async function POST(request) {
     // Tekst per pagina afkappen zodat de context niet overloopt
     const MAX_CHARS_PER_PAGE = 2000;
     const combinedText = pages
-      .map(p => `--- PAGINA ${p.page} ---\n${p.text.slice(0, MAX_CHARS_PER_PAGE)}`)
+      .map(p => `--- PAGINA ${p.page} ---\n${(p.text || '').slice(0, MAX_CHARS_PER_PAGE)}`)
       .join('\n\n');
 
     // Gemini 2.5 Flash via OpenAI-compatible endpoint
