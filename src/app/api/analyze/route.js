@@ -16,7 +16,7 @@ export async function POST(request) {
   }
 
   try {
-    const { pages } = await request.json();
+  
     const { pages, isScanned } = await request.json();
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
@@ -48,10 +48,7 @@ export async function POST(request) {
       ];
     } else {
       // Tekst-modus
-      const MAX_CHARS_PER_PAGE = 2000;
-      const combinedText = pages
-        .map(p => `--- PAGINA ${p.page} ---\n${p.text.slice(0, MAX_CHARS_PER_PAGE)}`)
-        .join('\n\n');
+      
       userContent = `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`;
     }
 
@@ -61,10 +58,7 @@ export async function POST(request) {
       max_tokens: 8192,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: `Analyseer de volgende geëxtraheerde tekst uit een Zwijsen-werkboek PDF:\n\n${combinedText}`,
-        },
+      
         { role: 'user', content: userContent },
       ],
     });
