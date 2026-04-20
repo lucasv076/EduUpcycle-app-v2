@@ -311,7 +311,7 @@ export default function EduUpcycleApp() {
       // Stap 3: AI analyse — in chunks van CHUNK_SIZE pagina's
       // Grote werkboeken (rekenen/taal/lezen) bevatten honderden pagina's;
       // één grote request zou de Groq context-limiet overschrijden.
-      const CHUNK_SIZE = 4;
+      const CHUNK_SIZE = 50;
 
       // Filter pagina's zonder bruikbare tekst (lege pagina's, omslagen, etc.)
       const textPages = allPages.filter(p => p.text && p.text.trim().length > 30);
