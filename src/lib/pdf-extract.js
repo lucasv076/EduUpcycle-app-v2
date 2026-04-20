@@ -36,7 +36,10 @@ export async function extractPdfPages(file) {
       .trim();
 
     // ── Pagina als afbeelding renderen ──
+    // ── Pagina als afbeelding renderen ──
     const scale = 1.5; // Balans tussen kwaliteit en performance
+    // ── Pagina als afbeelding renderen (weergave) ──
+    const scale = 1.5;
     const viewport = page.getViewport({ scale });
 
     const canvas = document.createElement('canvas');
@@ -46,12 +49,23 @@ export async function extractPdfPages(file) {
 
     await page.render({ canvasContext: ctx, viewport }).promise;
 
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+    // ── Kleinere versie voor API (vision) ──
+    const apiScale = 0.7;
+    const apiViewport = page.getViewport({ scale: apiScale });
+    const apiCanvas = document.createElement('canvas');
+    apiCanvas.width = apiViewport.width;
+    apiCanvas.height = apiViewport.height;
+    await page.render({ canvasContext: apiCanvas.getContext('2d'), viewport: apiViewport }).promise;
+    const apiImageDataUrl = apiCanvas.toDataURL('image/jpeg', 0.65);
 
     pages.push({
       page: i,
       text,
       imageDataUrl,
+      apiImageDataUrl,
     });
   }
 
