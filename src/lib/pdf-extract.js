@@ -38,8 +38,7 @@ export async function extractPdfPages(file) {
     // ── Pagina als afbeelding renderen ──
     // ── Pagina als afbeelding renderen ──
     const scale = 1.5; // Balans tussen kwaliteit en performance
-    // ── Pagina als afbeelding renderen (weergave) ──
-    const scale = 1.5;
+    
     const viewport = page.getViewport({ scale });
 
     const canvas = document.createElement('canvas');
