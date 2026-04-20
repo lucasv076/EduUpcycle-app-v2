@@ -327,10 +327,18 @@ export default function EduUpcycleApp() {
       let allExercises = [];
       let resultMode = 'ai';
 
+      const CHUNK_DELAY_MS = 5000;
+
       for (let ci = 0; ci < pageChunks.length; ci++) {
         const chunk = pageChunks[ci];
         const p1 = chunk[0].page;
         const p2 = chunk[chunk.length - 1].page;
+
+        if (ci > 0) {
+          setProcMsg(`Even wachten (rate limit)… pagina's ${p1}–${p2} volgt zo`);
+          await new Promise(r => setTimeout(r, CHUNK_DELAY_MS));
+        }
+
         setProcMsg(`AI analyseert pagina's ${p1}–${p2} (deel ${ci + 1} van ${pageChunks.length})…`);
 
         const response = await fetch('/api/analyze', {
@@ -344,12 +352,20 @@ export default function EduUpcycleApp() {
         if (!response.ok) {
           const err = await response.json().catch(() => ({}));
           if (err.error === 'NO_API_KEY') {
-            // Geen API key → demo-modus (stop chunking)
             setProcMsg('Geen API key gevonden — demo-modus laden…');
             await new Promise(r => setTimeout(r, 600));
             allExercises = DEMO_EXERCISES;
             resultMode = 'demo';
             break;
+          } else if (err.error === 'CONTEXT_TOO_LONG') {
+            // Pagina's met te veel tekst overslaan en doorgaan
+            setProcMsg(`Pagina's ${p1}–${p2} te lang voor AI — overgeslagen`);
+            await new Promise(r => setTimeout(r, 800));
+          } else if (err.error === 'RATE_LIMIT') {
+            // Extra wachttijd en opnieuw proberen
+            setProcMsg(`Rate limit bereikt — 15 seconden wachten…`);
+            await new Promise(r => setTimeout(r, 15000));
+            ci--; // zelfde chunk opnieuw
           } else {
             throw new Error(err.message || `API fout bij pagina's ${p1}–${p2}`);
           }
