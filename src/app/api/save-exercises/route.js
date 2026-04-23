@@ -20,7 +20,17 @@ export async function POST(request) {
       );
     }
 
-    const saved = await saveExercises(exercises);
+    // Als status is meegestuurd, slaan we alleen expliciet goedgekeurde records op.
+    const approvedOnly = exercises.filter((ex) => ex?.status === undefined || ex.status === 'approved');
+
+    if (approvedOnly.length === 0) {
+      return NextResponse.json(
+        { error: 'NO_APPROVED', message: 'Geen goedgekeurde oefeningen om op te slaan.' },
+        { status: 400 }
+      );
+    }
+
+    const saved = await saveExercises(approvedOnly);
     return NextResponse.json({ saved, count: saved.length });
 
   } catch (err) {
