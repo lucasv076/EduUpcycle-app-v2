@@ -107,8 +107,18 @@ function normalizeExercise(exercise, index, sourcePages) {
     block_max_height
   );
 
-  const parsedBlockIsMatch = typeof exercise?.block_is_match === 'boolean'
-    ? exercise.block_is_match
+  const block_option_a_grid = normalizeGrid(
+    exercise?.block_option_a_grid ?? exercise?.bouwsel_a_grid,
+    block_max_height
+  );
+
+  const block_option_b_grid = normalizeGrid(
+    exercise?.block_option_b_grid ?? exercise?.bouwsel_b_grid,
+    block_max_height
+  );
+
+  const parsedCorrectOption = typeof exercise?.block_correct_option === 'string'
+    ? exercise.block_correct_option.trim().toUpperCase()
     : null;
 
   const source_file_type = question_type === 'blokken_bouwsel'
@@ -119,9 +129,17 @@ function normalizeExercise(exercise, index, sourcePages) {
     ? (block_plan_grid || block_goal_grid)
     : block_plan_grid;
 
-  const block_is_match = question_type === 'blokken_bouwsel'
-    ? (parsedBlockIsMatch ?? true)
-    : parsedBlockIsMatch;
+  const normalizedOptionA = question_type === 'blokken_bouwsel'
+    ? block_option_a_grid
+    : block_option_a_grid;
+
+  const normalizedOptionB = question_type === 'blokken_bouwsel'
+    ? block_option_b_grid
+    : block_option_b_grid;
+
+  const block_correct_option = question_type === 'blokken_bouwsel'
+    ? (parsedCorrectOption === 'B' ? 'B' : 'A')
+    : null;
 
   const title = typeof exercise?.title === 'string' && exercise.title.trim().length > 0
     ? exercise.title.trim()
@@ -167,7 +185,9 @@ function normalizeExercise(exercise, index, sourcePages) {
     block_goal_grid,
     block_answer_grid,
     block_plan_grid: normalizedPlanGrid,
-    block_is_match,
+    block_option_a_grid: normalizedOptionA,
+    block_option_b_grid: normalizedOptionB,
+    block_correct_option,
     block_max_height,
     confidence,
     difficulty: typeof exercise?.difficulty === 'string' && exercise.difficulty.trim().length > 0

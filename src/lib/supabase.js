@@ -58,9 +58,18 @@ export async function saveExercises(exercises) {
       ex.block_plan_grid
       ?? ex.plattegrond_grid
       ?? null,
-    block_is_match: typeof ex.block_is_match === 'boolean'
-      ? ex.block_is_match
-      : null,
+    block_option_a_grid:
+      ex.block_option_a_grid
+      ?? ex.bouwsel_a_grid
+      ?? null,
+    block_option_b_grid:
+      ex.block_option_b_grid
+      ?? ex.bouwsel_b_grid
+      ?? null,
+    block_correct_option:
+      String(ex.block_correct_option || '').trim().toUpperCase() === 'B'
+        ? 'B'
+        : (ex.block_correct_option ? 'A' : null),
     block_max_height: Number.isFinite(Number(ex.block_max_height))
       ? Math.max(1, Math.min(20, Math.round(Number(ex.block_max_height))))
       : 5,

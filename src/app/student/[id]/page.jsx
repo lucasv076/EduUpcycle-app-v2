@@ -27,5 +27,12 @@ export default async function StudentExercisePage({ params }) {
     notFound();
   }
 
-  return <ExercisePage exercise={exercise} />;
+  const {
+    source_page_image_data_url,
+    source_file,
+    source_file_type,
+    ...studentExercise
+  } = exercise;
+
+  return <ExercisePage exercise={studentExercise} />;
 }

@@ -47,10 +47,11 @@ export default function ExercisePage({ exercise }) {
       <BlokkenBouwselInteractive
         goalGrid={exercise.block_goal_grid}
         planGrid={exercise.block_plan_grid}
-        isMatchExpected={exercise.block_is_match}
+        optionAGrid={exercise.block_option_a_grid}
+        optionBGrid={exercise.block_option_b_grid}
+        correctOption={exercise.block_correct_option}
         maxHeight={exercise.block_max_height}
-        sourceImageDataUrl={exercise.source_page_image_data_url}
-        onAnswered={(isGoed) => setAnswer(isGoed ? 'Goed' : 'Fout')}
+        onAnswered={(selectedOption) => setAnswer(selectedOption)}
         disabled={submitted}
       />
     );
