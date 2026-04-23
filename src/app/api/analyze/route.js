@@ -8,6 +8,26 @@
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
 
+function normalizeGrid(rawGrid, maxHeight = 5) {
+  if (!Array.isArray(rawGrid) || rawGrid.length === 0) return null;
+
+  const rows = rawGrid.map((row) => {
+    if (!Array.isArray(row) || row.length === 0) return null;
+    const mapped = row.map((cell) => {
+      const value = Number(cell);
+      if (!Number.isFinite(value)) return null;
+      const intValue = Math.round(value);
+      if (intValue < 0 || intValue > maxHeight) return null;
+      return intValue;
+    });
+
+    return mapped.some((v) => v === null) ? null : mapped;
+  });
+
+  if (rows.some((r) => r === null)) return null;
+  return rows;
+}
+
 function parseExercisesFromContent(content) {
   const trimmed = String(content || '').trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -21,6 +41,41 @@ function parseExercisesFromContent(content) {
 
 function normalizeExercise(exercise, index, sourcePages) {
   const sourcePage = sourcePages[index % sourcePages.length] || {};
+  const questionTypeRaw = typeof exercise?.question_type === 'string'
+    ? exercise.question_type
+    : typeof exercise?.vraagtype === 'string'
+      ? exercise.vraagtype
+      : null;
+  const question_type = questionTypeRaw === 'blokken_bouwsel' ? 'blokken_bouwsel' : 'standaard';
+
+  const sourceFileTypeRaw = typeof exercise?.source_file_type === 'string'
+    ? exercise.source_file_type
+    : typeof exercise?.bronbestand_type === 'string'
+      ? exercise.bronbestand_type
+      : null;
+  const source_file_type = sourceFileTypeRaw === 'pdf_tabel' || sourceFileTypeRaw === 'handmatig_json'
+    ? sourceFileTypeRaw
+    : null;
+
+  const blockMaxHeightRaw = Number(
+    exercise?.block_max_height
+    ?? exercise?.max_height
+    ?? 5
+  );
+  const block_max_height = Number.isFinite(blockMaxHeightRaw)
+    ? Math.max(1, Math.min(20, Math.round(blockMaxHeightRaw)))
+    : 5;
+
+  const block_goal_grid = normalizeGrid(
+    exercise?.block_goal_grid ?? exercise?.doel_grid,
+    block_max_height
+  );
+
+  const block_answer_grid = normalizeGrid(
+    exercise?.block_answer_grid ?? exercise?.antwoord_grid,
+    block_max_height
+  );
+
   const title = typeof exercise?.title === 'string' && exercise.title.trim().length > 0
     ? exercise.title.trim()
     : `Oefening ${index + 1}`;
@@ -57,7 +112,14 @@ function normalizeExercise(exercise, index, sourcePages) {
     original,
     type: typeof exercise?.type === 'string' && exercise.type.trim().length > 0
       ? exercise.type.trim()
+      : question_type === 'blokken_bouwsel'
+        ? 'Blokkenbouwsel'
       : 'Open vraag',
+    question_type,
+    source_file_type,
+    block_goal_grid,
+    block_answer_grid,
+    block_max_height,
     confidence,
     difficulty: typeof exercise?.difficulty === 'string' && exercise.difficulty.trim().length > 0
       ? exercise.difficulty.trim()

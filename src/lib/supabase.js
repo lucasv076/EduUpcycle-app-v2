@@ -4,8 +4,13 @@
 //   SUPABASE_URL       → bijv. https://abc123.supabase.co
 //   SUPABASE_ANON_KEY  → je project's anon/public key
 
-const URL_  = process.env.SUPABASE_URL;
-const KEY_  = process.env.SUPABASE_ANON_KEY;
+const URL_ = process.env.SUPABASE_URL
+  || process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+const KEY_ = process.env.SUPABASE_ANON_KEY
+  || process.env.SUPABASE_PUBLISHABLE_KEY
+  || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 function isConfigured() {
   return !!(URL_ && KEY_);
@@ -36,6 +41,22 @@ export async function saveExercises(exercises) {
     format:      ex.format,
     note:        ex.note,
     variants:    ex.variants ?? [],   // JSONB
+    question_type: ex.question_type === 'blokken_bouwsel' ? 'blokken_bouwsel' : 'standaard',
+    source_file_type:
+      ex.source_file_type === 'pdf_tabel' || ex.source_file_type === 'handmatig_json'
+        ? ex.source_file_type
+        : null,
+    block_goal_grid:
+      ex.block_goal_grid
+      ?? ex.doel_grid
+      ?? null,
+    block_answer_grid:
+      ex.block_answer_grid
+      ?? ex.antwoord_grid
+      ?? null,
+    block_max_height: Number.isFinite(Number(ex.block_max_height))
+      ? Math.max(1, Math.min(20, Math.round(Number(ex.block_max_height))))
+      : 5,
     page:        ex.page,
     source_file: ex.source_file ?? null,
   }));

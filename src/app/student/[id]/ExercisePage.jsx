@@ -91,7 +91,9 @@ export default function ExercisePage({ exercise }) {
         <ZwijsenLogo />
         <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.25)' }} />
         <span style={{ fontWeight: 800, fontSize: 16 }}>Oefeningen</span>
-        <Link href="/student" style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)',
+        <Link href="/" style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)',
+          fontSize: 12, textDecoration: 'none' }}>Portalen</Link>
+        <Link href="/student" style={{ marginLeft: 14, color: 'rgba(255,255,255,0.75)',
           fontSize: 12, textDecoration: 'none' }}>← Terug naar overzicht</Link>
       </header>
 

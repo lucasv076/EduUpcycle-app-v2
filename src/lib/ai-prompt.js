@@ -11,7 +11,7 @@ Analyseer de volgende PDF-pagina tekst en identificeer ALLE afzonderlijke oefeni
 ## Per oefening lever je:
 1. **title**: Een korte, beschrijvende titel (max 8 woorden)
 2. **original**: De exacte originele tekst uit de PDF
-3. **type**: Eén van: "Open vraag", "Invulvraag", "Meerkeuze", "Tekenopgave", "Manipulatieopdracht"
+3. **type**: Eén van: "Open vraag", "Invulvraag", "Meerkeuze", "Tekenopgave", "Manipulatieopdracht", "Blokkenbouwsel"
 4. **confidence**: Getal 0-100 dat aangeeft hoe zeker je bent van het vraagtype
 5. **difficulty**: "Makkelijk", "Gemiddeld", of "Moeilijk"
 6. **topic**: Onderwerp + subonderwerp (bijv. "Rekenen – Optellen tot 20")
@@ -21,6 +21,11 @@ Analyseer de volgende PDF-pagina tekst en identificeer ALLE afzonderlijke oefeni
    - Eén MAKKELIJKER variant (label: "Makkelijker")
    - Eén MOEILIJKER variant (label: "Moeilijker")
    Elke variant bevat een compleet geformuleerde oefeningstekst.
+10. **question_type**: "standaard" of "blokken_bouwsel"
+11. **source_file_type**: "pdf_tabel" of "handmatig_json" (alleen relevant voor blokken_bouwsel)
+12. **block_goal_grid**: 2D-array met hoogtes (0-5), bijvoorbeeld [[2,1,3],[0,2,1]] (alleen voor blokken_bouwsel)
+13. **block_answer_grid**: meestal null bij analyse; alleen invullen als er al een leerlingantwoord aanwezig is
+14. **block_max_height**: integer, standaard 5
 
 ## Regels
 - Detecteer OOK oefeningen die fysiek materiaal vereisen (knippen, plakken, tekenen) — markeer deze met lagere confidence
@@ -28,6 +33,7 @@ Analyseer de volgende PDF-pagina tekst en identificeer ALLE afzonderlijke oefeni
 - Geef altijd een eerlijk confidence percentage — 100% alleen als het type overduidelijk is
 - Schrijf alles in het Nederlands
 - Gebruik kindvriendelijke taal voor de varianten
+- Als een oefening een 3D-blokkenbouwsel is, zet question_type op "blokken_bouwsel" en vul block_goal_grid in
 
 ## Output format
 Antwoord ALLEEN met een JSON-array. Geen tekst ervoor of erna.
@@ -41,6 +47,11 @@ Antwoord ALLEEN met een JSON-array. Geen tekst ervoor of erna.
     "topic": "...",
     "format": "...",
     "note": "...",
+    "question_type": "standaard",
+    "source_file_type": null,
+    "block_goal_grid": null,
+    "block_answer_grid": null,
+    "block_max_height": 5,
     "variants": [
       { "level": "Makkelijker", "text": "..." },
       { "level": "Moeilijker", "text": "..." }
