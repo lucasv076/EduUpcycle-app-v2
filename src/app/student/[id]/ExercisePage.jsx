@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
+import { BlokkenBouwselInteractive } from '@/components/blokken-bouwsel';
 
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -24,6 +25,7 @@ export default function ExercisePage({ exercise }) {
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
+  const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
 
   const questionText = hasVariants
     ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
@@ -41,6 +43,18 @@ export default function ExercisePage({ exercise }) {
 
   // ── Input op basis van vraagtype ────────────────────────────────────
   const renderInput = () => {
+    if (isBlockQuestion) return (
+      <BlokkenBouwselInteractive
+        goalGrid={exercise.block_goal_grid}
+        planGrid={exercise.block_plan_grid}
+        isMatchExpected={exercise.block_is_match}
+        maxHeight={exercise.block_max_height}
+        sourceImageDataUrl={exercise.source_page_image_data_url}
+        onAnswered={(isGoed) => setAnswer(isGoed ? 'Goed' : 'Fout')}
+        disabled={submitted}
+      />
+    );
+
     if (exercise.type === 'Invulvraag') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>

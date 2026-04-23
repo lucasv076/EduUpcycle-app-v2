@@ -5,6 +5,7 @@ import { C, TYPE_COLORS, confColor } from '@/lib/colors';
 import { DEMO_EXERCISES } from '@/lib/demo-data';
 import { extractPdfPages } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
+import { BlokkenBouwselInteractive } from '@/components/blokken-bouwsel';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
 const Badge = ({ label, bg, color, small }) => (
@@ -55,6 +56,7 @@ function StudentPreview({ exercise, onClose }) {
   const easyVariant = exercise.variants?.[0]; // { level: 'Makkelijker', text: '...' }
   const hardVariant = exercise.variants?.[1]; // { level: 'Moeilijker',  text: '...' }
   const hasVariants = !!(easyVariant && hardVariant);
+  const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
 
   // Welke vraagstekst tonen we nu?
   const questionText = hasVariants
@@ -73,6 +75,16 @@ function StudentPreview({ exercise, onClose }) {
 
   // Input-component op basis van vraagtype
   const renderInput = () => {
+    if (isBlockQuestion) return (
+      <BlokkenBouwselInteractive
+        goalGrid={exercise.block_goal_grid}
+        planGrid={exercise.block_plan_grid}
+        isMatchExpected={exercise.block_is_match}
+        maxHeight={exercise.block_max_height}
+        sourceImageDataUrl={exercise.source_page_image_data_url}
+      />
+    );
+
     if (exercise.type === 'Invulvraag') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label style={{ fontSize: 13, color: C.textMid }}>Jouw antwoord:</label>
@@ -348,7 +360,12 @@ export default function EduUpcycleApp() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            pages: chunk.map(p => ({ page: p.page, text: p.text, fileName: p.fileName })),
+            pages: chunk.map(p => ({
+              page: p.page,
+              text: p.text,
+              fileName: p.fileName,
+              aiImageDataUrl: p.aiImageDataUrl || null,
+            })),
           }),
         });
 
@@ -394,8 +411,20 @@ export default function EduUpcycleApp() {
       await new Promise(r => setTimeout(r, 600));
 
       // Klaar → naar review stap
+      const pageImageByFileAndPage = new Map(
+        allPages.map((p) => [`${p.fileName}-p${p.page}`, p.imageDataUrl])
+      );
+
       setProcIdx(4);
-      setExercises(allExercises.map((ex, i) => ({ ...ex, id: i + 1, status: null })));
+      setExercises(allExercises.map((ex, i) => {
+        const imageKey = `${ex.fileName}-p${ex.page}`;
+        return {
+          ...ex,
+          id: i + 1,
+          status: null,
+          source_page_image_data_url: pageImageByFileAndPage.get(imageKey) || null,
+        };
+      }));
       setMode(resultMode);
       setSelectedId(1);
       setStep(2);

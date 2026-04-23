@@ -58,7 +58,7 @@ async function getPdfJs() {
 /**
  * Extraheert tekst en renders per pagina uit een PDF-bestand.
  * @param {File} file - Het geüploade PDF-bestand
- * @returns {Promise<Array<{ page: number, text: string, imageDataUrl: string }>>}
+ * @returns {Promise<Array<{ page: number, text: string, imageDataUrl: string, aiImageDataUrl: string }>>}
  */
 export async function extractPdfPages(file) {
   const pdfjs = await getPdfJs();
@@ -72,6 +72,7 @@ export async function extractPdfPages(file) {
 
     let text = '';
     let imageDataUrl = null;
+    let aiImageDataUrl = null;
 
     try {
       // ── Tekst extraheren ──
@@ -99,6 +100,18 @@ export async function extractPdfPages(file) {
       if (ctx) {
         await page.render({ canvasContext: ctx, viewport }).promise;
         imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        // Compacte versie voor vision-analyse om payload beheersbaar te houden.
+        const maxAiWidth = 640;
+        const ratio = Math.min(1, maxAiWidth / canvas.width);
+        const aiCanvas = document.createElement('canvas');
+        aiCanvas.width = Math.max(1, Math.round(canvas.width * ratio));
+        aiCanvas.height = Math.max(1, Math.round(canvas.height * ratio));
+        const aiCtx = aiCanvas.getContext('2d');
+        if (aiCtx) {
+          aiCtx.drawImage(canvas, 0, 0, aiCanvas.width, aiCanvas.height);
+          aiImageDataUrl = aiCanvas.toDataURL('image/jpeg', 0.62);
+        }
       }
     } catch (error) {
       // Fallback: geen afbeelding voor deze pagina, maar wel doorgaan.
@@ -109,6 +122,7 @@ export async function extractPdfPages(file) {
       page: i,
       text,
       imageDataUrl,
+      aiImageDataUrl,
     });
   }
 

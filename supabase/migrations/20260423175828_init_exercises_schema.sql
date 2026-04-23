@@ -51,11 +51,14 @@ CREATE TABLE IF NOT EXISTS exercises (
 	source_file_type TEXT,
 	block_goal_grid  JSONB,
 	block_answer_grid JSONB,
+	block_plan_grid JSONB,
+	block_is_match BOOLEAN,
 	block_max_height INTEGER NOT NULL DEFAULT 5,
 
 	-- Herkomst
 	page        INTEGER,
-	source_file TEXT
+	source_file TEXT,
+	source_page_image_data_url TEXT
 
 	,CONSTRAINT exercises_question_type_chk
 		CHECK (question_type IN ('standaard', 'blokken_bouwsel'))
@@ -78,7 +81,10 @@ CREATE TABLE IF NOT EXISTS exercises (
 			OR (
 				source_file_type IS NOT NULL
 				AND block_goal_grid IS NOT NULL
+				AND block_plan_grid IS NOT NULL
+				AND block_is_match IS NOT NULL
 				AND is_valid_block_grid(block_goal_grid, block_max_height)
+				AND is_valid_block_grid(block_plan_grid, block_max_height)
 				AND (
 					block_answer_grid IS NULL
 					OR is_valid_block_grid(block_answer_grid, block_max_height)
@@ -92,7 +98,10 @@ ALTER TABLE exercises
 	ADD COLUMN IF NOT EXISTS source_file_type TEXT,
 	ADD COLUMN IF NOT EXISTS block_goal_grid JSONB,
 	ADD COLUMN IF NOT EXISTS block_answer_grid JSONB,
-	ADD COLUMN IF NOT EXISTS block_max_height INTEGER NOT NULL DEFAULT 5;
+	ADD COLUMN IF NOT EXISTS block_plan_grid JSONB,
+	ADD COLUMN IF NOT EXISTS block_is_match BOOLEAN,
+	ADD COLUMN IF NOT EXISTS block_max_height INTEGER NOT NULL DEFAULT 5,
+	ADD COLUMN IF NOT EXISTS source_page_image_data_url TEXT;
 
 DO $$
 BEGIN
@@ -146,7 +155,10 @@ BEGIN
 				OR (
 					source_file_type IS NOT NULL
 					AND block_goal_grid IS NOT NULL
+					AND block_plan_grid IS NOT NULL
+					AND block_is_match IS NOT NULL
 					AND is_valid_block_grid(block_goal_grid, block_max_height)
+					AND is_valid_block_grid(block_plan_grid, block_max_height)
 					AND (
 						block_answer_grid IS NULL
 						OR is_valid_block_grid(block_answer_grid, block_max_height)
