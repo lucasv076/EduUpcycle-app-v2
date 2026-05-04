@@ -283,6 +283,7 @@ export function BlokkenBouwselInteractive({
   onAnswered,
   sourceImageDataUrl,
   showSourceImage = false,
+  showFeedback = true,
   disabled = false,
   buildMode = false,
 }) {
@@ -384,7 +385,7 @@ export function BlokkenBouwselInteractive({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Meerkeuze: kies A of B.</div>
-        {choice !== null && (
+        {showFeedback && choice !== null && (
           <div style={{ fontSize: 12, color: choice === expectedOption ? C.green : C.red, fontWeight: 700 }}>
             {choice === expectedOption ? 'Correct gekozen.' : 'Nog niet juist. Kijk naar de getallen in de plattegrond.'}
           </div>

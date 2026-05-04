@@ -64,6 +64,7 @@ export default function ExercisePage({ exercise }) {
         onAnswered={(val) => setAnswer(val)}
         disabled={submitted}
         buildMode={isBuildMode}
+        showFeedback={submitted}
       />
     );
 
@@ -93,7 +94,7 @@ export default function ExercisePage({ exercise }) {
     if (exercise.type === 'Meerkeuze') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
         {['Antwoord A', 'Antwoord B', 'Antwoord C', 'Antwoord D'].map((opt, i) => (
-          <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
+          <button type="button" key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
             style={{ textAlign: 'left', padding: '13px 18px', borderRadius: 10, fontSize: 15,
               border: `2px solid ${answer === opt ? C.purple : C.border}`,
               background: answer === opt ? C.purpleLight : C.white, color: C.text,
@@ -167,7 +168,7 @@ export default function ExercisePage({ exercise }) {
               Je hebt beide niveaus afgerond!
             </div>
             <Link href="/student">
-              <button style={{ background: C.purple, color: 'white', border: 'none',
+              <button type="button" style={{ background: C.purple, color: 'white', border: 'none',
                 borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
                 cursor: 'pointer' }}>
                 Nog een oefening →
@@ -190,7 +191,7 @@ export default function ExercisePage({ exercise }) {
 
             {/* Submit / feedback */}
             {!submitted ? (
-              <button onClick={handleSubmit} disabled={!answer}
+              <button type="button" onClick={handleSubmit} disabled={!answer}
                 style={{ marginTop: 24, background: C.purple, color: 'white', border: 'none',
                   borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
                   opacity: answer ? 1 : 0.4, cursor: answer ? 'pointer' : 'not-allowed' }}>
@@ -221,7 +222,7 @@ export default function ExercisePage({ exercise }) {
                 )}
 
                 {phase === 'easy' && hasVariants && (
-                  <button onClick={handleNextLevel}
+                  <button type="button" onClick={handleNextLevel}
                     style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`,
                       color: 'white', border: 'none', borderRadius: 10,
                       padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
@@ -230,7 +231,7 @@ export default function ExercisePage({ exercise }) {
                 )}
 
                 {phase === 'hard' && (
-                  <button onClick={handleDone}
+                  <button type="button" onClick={handleDone}
                     style={{ background: C.green, color: 'white', border: 'none',
                       borderRadius: 10, padding: '13px 32px', fontWeight: 700,
                       fontSize: 15, cursor: 'pointer', marginTop: isBuildMode ? 12 : 0 }}>
