@@ -155,7 +155,7 @@ function normalizeExercise(exercise, index, sourcePages) {
   const blockInteractionTypeRaw = typeof exercise?.block_interaction_type === 'string'
     ? exercise.block_interaction_type.trim().toLowerCase()
     : null;
-  const VALID_INTERACTION_TYPES = ['tellen', 'goedFout', 'bouwen'];
+  const VALID_INTERACTION_TYPES = ['tellen', 'goedFout', 'bouwen', 'meerkeuze'];
   const block_interaction_type = question_type === 'blokken_bouwsel'
     ? (VALID_INTERACTION_TYPES.includes(blockInteractionTypeRaw) ? blockInteractionTypeRaw : 'goedFout')
     : null;

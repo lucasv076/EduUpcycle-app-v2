@@ -52,10 +52,14 @@ export default function ExercisePage({ exercise }) {
             ? 'meerkeuze'
             : 'goedFout'))
     : null;
-  const isBuildMode = blockInteractionType === 'bouwen';
-  const isTellenMode = blockInteractionType === 'tellen';
-  const isGoedFoutMode = blockInteractionType === 'goedFout';
-  const isMeerkeuzMode = blockInteractionType === 'meerkeuze';
+  const isHardVariant = phase === 'hard';
+  const activeBlockInteractionType = isBlockQuestion && isHardVariant
+    ? 'bouwen'
+    : blockInteractionType;
+  const isBuildMode = activeBlockInteractionType === 'bouwen';
+  const isTellenMode = activeBlockInteractionType === 'tellen';
+  const isGoedFoutMode = activeBlockInteractionType === 'goedFout';
+  const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
   const maxH = exercise.block_max_height || 5;
 
   const questionText = hasVariants
