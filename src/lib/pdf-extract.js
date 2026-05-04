@@ -101,8 +101,8 @@ export async function extractPdfPages(file) {
         await page.render({ canvasContext: ctx, viewport }).promise;
         imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
-        // Compacte versie voor vision-analyse om payload beheersbaar te houden.
-        const maxAiWidth = 640;
+        // Versie voor vision-analyse: hogere resolutie zodat rastergetallen leesbaar blijven.
+        const maxAiWidth = 1024;
         const ratio = Math.min(1, maxAiWidth / canvas.width);
         const aiCanvas = document.createElement('canvas');
         aiCanvas.width = Math.max(1, Math.round(canvas.width * ratio));
@@ -110,7 +110,7 @@ export async function extractPdfPages(file) {
         const aiCtx = aiCanvas.getContext('2d');
         if (aiCtx) {
           aiCtx.drawImage(canvas, 0, 0, aiCanvas.width, aiCanvas.height);
-          aiImageDataUrl = aiCanvas.toDataURL('image/jpeg', 0.62);
+          aiImageDataUrl = aiCanvas.toDataURL('image/jpeg', 0.82);
         }
       }
     } catch (error) {

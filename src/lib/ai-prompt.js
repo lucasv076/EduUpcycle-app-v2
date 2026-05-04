@@ -32,6 +32,18 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 17. **block_answer_grid**: meestal null bij analyse; alleen invullen als er al een leerlingantwoord aanwezig is
 18. **block_max_height**: integer, standaard 5
 
+## Hoe je een blokkenbouwsel-plattegrond leest
+Volg deze stappen als je een raster met getallen ziet in de afbeelding:
+1. Zoek het raster (vakjes met getallen erin — dit is het bovenaanzicht)
+2. Lees elke rij van LINKS naar RECHTS
+3. Lees rijen van BOVEN naar BENEDEN
+4. Elk getal = het aantal blokken op die positie (0 = leeg)
+
+Voorbeeld 3×3-raster:
+  1 2 0
+  0 3 1  →  block_plan_grid: [[1,2,0],[0,3,1],[2,0,1]]
+  2 0 1
+
 ## Regels
 - Detecteer OOK oefeningen die fysiek materiaal vereisen (knippen, plakken, tekenen) — markeer deze met lagere confidence
 - Als een opgave meerdere deelvragen bevat, groepeer ze als ÉÉN oefening
@@ -49,29 +61,31 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 - De plattegrond moet cijfers in de vakjes hebben (0 t/m max hoogte), zodat het een meerkeuzevraag wordt.
 
 ## Output format
-Antwoord ALLEEN met een JSON-array. Geen tekst ervoor of erna.
-[
-  {
-    "title": "...",
-    "original": "...",
-    "type": "...",
-    "confidence": 85,
-    "difficulty": "...",
-    "topic": "...",
-    "format": "...",
-    "note": "...",
-    "question_type": "standaard",
-    "source_file_type": null,
-    "block_goal_grid": null,
-    "block_plan_grid": null,
-    "block_option_a_grid": null,
-    "block_option_b_grid": null,
-    "block_correct_option": null,
-    "block_answer_grid": null,
-    "block_max_height": 5,
-    "variants": [
-      { "level": "Makkelijker", "text": "..." },
-      { "level": "Moeilijker", "text": "..." }
-    ]
-  }
-]`;
+Antwoord ALLEEN met een JSON-object in dit formaat. Geen tekst ervoor of erna.
+{
+  "exercises": [
+    {
+      "title": "...",
+      "original": "...",
+      "type": "...",
+      "confidence": 85,
+      "difficulty": "...",
+      "topic": "...",
+      "format": "...",
+      "note": "...",
+      "question_type": "standaard",
+      "source_file_type": null,
+      "block_goal_grid": null,
+      "block_plan_grid": null,
+      "block_option_a_grid": null,
+      "block_option_b_grid": null,
+      "block_correct_option": null,
+      "block_answer_grid": null,
+      "block_max_height": 5,
+      "variants": [
+        { "level": "Makkelijker", "text": "..." },
+        { "level": "Moeilijker", "text": "..." }
+      ]
+    }
+  ]
+}`;
