@@ -67,7 +67,7 @@ Voorbeeld 3×3-raster:
 
 ## Varianten voor blokkenbouwsel — KRITIEKE REGELS
 - **Het block_interaction_type NOOIT veranderen in een variant.** Als het origineel "meerkeuze" is, zijn BEIDE varianten ook "meerkeuze". Als het origineel "bouwen" is, zijn BEIDE varianten ook "bouwen".
-- **De moeilijkheidsgraad zit in het bouwsel, NIET in de vraagvorm.** Een makkelijkere variant heeft een eenvoudiger grid (minder hoogteverschillen, minder vakjes, lagere max-hoogte, maximaal 10). Een moeilijkere variant heeft een complexer grid en mag tussen 10 en 18 zitten.
+- **De moeilijkheidsgraad zit in het bouwsel, NIET in de vraagvorm.** Een makkelijkere variant heeft een eenvoudiger grid (minder hoogteverschillen, minder vakjes maximaal 10 blokken). Een moeilijkere variant heeft meerdere vakjes met hogere blokken (tot max 5 hoog) en meer variatie in de getallen. Maar de vraagvorm blijft hetzelfde.
 - **De vraagstelling in de varianttekst moet bijna gelijk zijn aan het origineel** — alleen de instructie wordt iets meer of minder uitgebreid afhankelijk van het niveau.
 
 Richtlijn per interaction_type:
