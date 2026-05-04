@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS exercises (
   block_goal_grid  JSONB,         -- 2D-array met doelhoogtes (doel_grid)
   block_answer_grid JSONB,        -- 2D-array met leerlingantwoord (antwoord_grid)
   block_plan_grid JSONB,          -- 2D-array van de getoonde plattegrond in de vraag
+  block_option_a_grid JSONB,      -- antwoordoptie A als 2D-array
+  block_option_b_grid JSONB,      -- antwoordoptie B als 2D-array
+  block_correct_option TEXT,      -- juiste optie: A of B
   block_is_match BOOLEAN,         -- correcte uitkomst voor goed/fout op de plattegrond
   block_max_height INTEGER NOT NULL DEFAULT 5,
 
@@ -86,9 +89,13 @@ CREATE TABLE IF NOT EXISTS exercises (
         source_file_type IS NOT NULL
         AND block_goal_grid IS NOT NULL
         AND block_plan_grid IS NOT NULL
-        AND block_is_match IS NOT NULL
+        AND block_option_a_grid IS NOT NULL
+        AND block_option_b_grid IS NOT NULL
+        AND block_correct_option IN ('A', 'B')
         AND is_valid_block_grid(block_goal_grid, block_max_height)
         AND is_valid_block_grid(block_plan_grid, block_max_height)
+        AND is_valid_block_grid(block_option_a_grid, block_max_height)
+        AND is_valid_block_grid(block_option_b_grid, block_max_height)
         AND (
           block_answer_grid IS NULL
           OR is_valid_block_grid(block_answer_grid, block_max_height)
@@ -103,6 +110,9 @@ ALTER TABLE exercises
   ADD COLUMN IF NOT EXISTS block_goal_grid JSONB,
   ADD COLUMN IF NOT EXISTS block_answer_grid JSONB,
   ADD COLUMN IF NOT EXISTS block_plan_grid JSONB,
+  ADD COLUMN IF NOT EXISTS block_option_a_grid JSONB,
+  ADD COLUMN IF NOT EXISTS block_option_b_grid JSONB,
+  ADD COLUMN IF NOT EXISTS block_correct_option TEXT,
   ADD COLUMN IF NOT EXISTS block_is_match BOOLEAN,
   ADD COLUMN IF NOT EXISTS block_max_height INTEGER NOT NULL DEFAULT 5,
   ADD COLUMN IF NOT EXISTS source_page_image_data_url TEXT;
@@ -160,9 +170,13 @@ BEGIN
           source_file_type IS NOT NULL
           AND block_goal_grid IS NOT NULL
           AND block_plan_grid IS NOT NULL
-          AND block_is_match IS NOT NULL
+          AND block_option_a_grid IS NOT NULL
+          AND block_option_b_grid IS NOT NULL
+          AND block_correct_option IN ('A', 'B')
           AND is_valid_block_grid(block_goal_grid, block_max_height)
           AND is_valid_block_grid(block_plan_grid, block_max_height)
+          AND is_valid_block_grid(block_option_a_grid, block_max_height)
+          AND is_valid_block_grid(block_option_b_grid, block_max_height)
           AND (
             block_answer_grid IS NULL
             OR is_valid_block_grid(block_answer_grid, block_max_height)

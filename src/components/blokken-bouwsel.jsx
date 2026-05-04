@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { C } from '@/lib/colors';
 
-function clampGrid(grid, maxHeight) {
+export function clampGrid(grid, maxHeight) {
   if (!Array.isArray(grid)) return [];
 
   return grid.map((row) => (
@@ -17,7 +17,7 @@ function clampGrid(grid, maxHeight) {
   ));
 }
 
-function gridsEqual(left, right) {
+export function gridsEqual(left, right) {
   if (!Array.isArray(left) || !Array.isArray(right)) return false;
   if (left.length !== right.length) return false;
 
@@ -114,6 +114,141 @@ function CubePreview({ grid }) {
   );
 }
 
+function PlanGridDisplay({ grid }) {
+  const cols = grid[0]?.length || 0;
+  return (
+    <div style={{
+      display: 'grid', gap: 4, width: 'fit-content',
+      gridTemplateColumns: `repeat(${cols}, 32px)`,
+    }}>
+      {grid.flatMap((row, y) => row.map((cell, x) => (
+        <div
+          key={`${x}-${y}`}
+          style={{
+            width: 32, height: 32, borderRadius: 6,
+            border: `1px solid ${C.border}`,
+            background: cell > 0 ? '#D7B4E0' : '#FFFFFF',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 700, color: '#5C4070',
+          }}
+        >
+          {cell}
+        </div>
+      )))}
+    </div>
+  );
+}
+
+// ── BlockBuilder: leerling bouwt zelf het 3D bouwsel ─────────────────
+function BlockBuilder({ planGrid, maxHeight, onAnswered, disabled }) {
+  const rows = planGrid?.length || 3;
+  const cols = planGrid?.[0]?.length || 3;
+
+  const [builtGrid, setBuiltGrid] = useState(
+    () => Array.from({ length: rows }, () => Array(cols).fill(0))
+  );
+
+  const updateCell = (y, x, delta) => {
+    if (disabled) return;
+    const next = builtGrid.map((r) => [...r]);
+    next[y][x] = Math.max(0, Math.min(maxHeight, next[y][x] + delta));
+    setBuiltGrid(next);
+    onAnswered?.(next);
+  };
+
+  const hasBlocks = builtGrid.flat().some((v) => v > 0);
+  const isCorrect = gridsEqual(builtGrid, planGrid);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {/* Reference floor plan */}
+      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+          Plattegrond — dit is jouw doel
+        </div>
+        <PlanGridDisplay grid={planGrid} />
+      </div>
+
+      {/* Interactive builder grid */}
+      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 10 }}>
+          Klik <strong>+</strong> om een blok toe te voegen, <strong>−</strong> om een blok te verwijderen
+        </div>
+        <div style={{
+          display: 'grid', gap: 8, width: 'fit-content',
+          gridTemplateColumns: `repeat(${cols}, 52px)`,
+        }}>
+          {builtGrid.flatMap((row, y) => row.map((cell, x) => (
+            <div
+              key={`build-${x}-${y}`}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}
+            >
+              <button
+                type="button"
+                onClick={() => updateCell(y, x, 1)}
+                disabled={disabled || cell >= maxHeight}
+                style={{
+                  width: 52, height: 24, borderRadius: '6px 6px 0 0', border: 'none',
+                  background: disabled || cell >= maxHeight ? '#DDD' : C.purple,
+                  color: 'white', fontWeight: 800, fontSize: 16,
+                  cursor: disabled || cell >= maxHeight ? 'default' : 'pointer',
+                  lineHeight: 1,
+                }}
+              >+</button>
+              <div style={{
+                width: 52, height: 38,
+                border: `2px solid ${cell > 0 ? '#9B59B6' : C.border}`,
+                background: cell > 0 ? '#D7B4E0' : '#F8F6FA',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, fontWeight: 800, color: '#5C4070',
+                transition: 'background 0.15s, border-color 0.15s',
+              }}>
+                {cell}
+              </div>
+              <button
+                type="button"
+                onClick={() => updateCell(y, x, -1)}
+                disabled={disabled || cell <= 0}
+                style={{
+                  width: 52, height: 24, borderRadius: '0 0 6px 6px', border: 'none',
+                  background: disabled || cell <= 0 ? '#DDD' : C.pink,
+                  color: 'white', fontWeight: 800, fontSize: 18,
+                  cursor: disabled || cell <= 0 ? 'default' : 'pointer',
+                  lineHeight: 1,
+                }}
+              >−</button>
+            </div>
+          )))}
+        </div>
+      </div>
+
+      {/* Live 3D preview */}
+      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+          Jouw bouwsel (3D voorvertoning)
+        </div>
+        <CubePreview grid={hasBlocks ? builtGrid : [[0]]} />
+      </div>
+
+      {/* Feedback after submit */}
+      {disabled && (
+        <div style={{
+          fontSize: 13, fontWeight: 700,
+          color: isCorrect ? C.green : C.red,
+          background: isCorrect ? C.greenLight : C.redLight,
+          border: `1.5px solid ${isCorrect ? C.green : C.red}`,
+          borderRadius: 8, padding: '10px 14px',
+        }}>
+          {isCorrect
+            ? '✓ Perfect! Jouw bouwsel past precies bij de plattegrond.'
+            : '✗ Nog niet helemaal goed. Vergelijk jouw getallen met de plattegrond.'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChoiceBuild({ label, grid, selected, disabled, onSelect }) {
   return (
     <button
@@ -149,6 +284,7 @@ export function BlokkenBouwselInteractive({
   sourceImageDataUrl,
   showSourceImage = false,
   disabled = false,
+  buildMode = false,
 }) {
   const normalizedGoal = useMemo(() => clampGrid(goalGrid, maxHeight), [goalGrid, maxHeight]);
   const normalizedPlan = useMemo(() => clampGrid(planGrid, maxHeight), [planGrid, maxHeight]);
@@ -189,6 +325,19 @@ export function BlokkenBouwselInteractive({
     );
   }
 
+  // ── Build mode: leerling bouwt zelf het bouwsel ──────────────────────
+  if (buildMode) {
+    return (
+      <BlockBuilder
+        planGrid={shownPlan}
+        maxHeight={maxHeight}
+        onAnswered={onAnswered}
+        disabled={disabled}
+      />
+    );
+  }
+
+  // ── Multiple choice mode ─────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
@@ -217,33 +366,7 @@ export function BlokkenBouwselInteractive({
         <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
           Plattegrond met getallen
         </div>
-        <div style={{ display: 'grid', gap: 4, width: 'fit-content', gridTemplateColumns: `repeat(${shownPlan[0]?.length || 0}, 28px)` }}>
-          {shownPlan.length > 0 && shownPlan.flatMap((row, y) => row.map((cell, x) => (
-            <div
-              key={`${x}-${y}`}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                border: `1px solid ${C.border}`,
-                background: cell > 0 ? '#D7B4E0' : '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#5C4070',
-              }}
-            >
-              {cell}
-            </div>
-          ))) }
-          {shownPlan.length === 0 && (
-            <div style={{ fontSize: 12, color: C.textMid }}>
-              Geen AI-plattegrond beschikbaar.
-            </div>
-          )}
-        </div>
+        <PlanGridDisplay grid={shownPlan} />
       </div>
 
       {showSourceImage && sourceImageDataUrl && (

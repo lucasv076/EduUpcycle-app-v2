@@ -24,11 +24,11 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
    Elke variant bevat een compleet geformuleerde oefeningstekst.
 10. **question_type**: "standaard" of "blokken_bouwsel"
 11. **source_file_type**: "pdf_tabel" of "handmatig_json" (alleen relevant voor blokken_bouwsel)
-12. **block_goal_grid**: 2D-array met hoogtes (0-5), bijvoorbeeld [[2,1,3],[0,2,1]] (alleen voor blokken_bouwsel)
-13. **block_plan_grid**: 2D-array met getallen (0-5) die zichtbaar in de vakjes van de plattegrond staan (alleen voor blokken_bouwsel)
+12. **block_goal_grid**: 2D-array met hoogtes (0-5) van het CORRECTE bouwsel — identiek aan het correcte optie-grid (alleen voor blokken_bouwsel)
+13. **block_plan_grid**: 2D-array met getallen (0-5) — dit is de plattegrond die de leerling ziet. MOET IDENTIEK zijn aan block_goal_grid en aan het correcte optie-grid (alleen voor blokken_bouwsel)
 14. **block_option_a_grid**: 2D-array met hoogtes (0-5) voor 3D bouwsel A
 15. **block_option_b_grid**: 2D-array met hoogtes (0-5) voor 3D bouwsel B
-16. **block_correct_option**: "A" of "B" (welk bouwsel past bij de plattegrond)
+16. **block_correct_option**: "A" of "B" — het bouwsel dat EXACT dezelfde grid heeft als block_plan_grid/block_goal_grid
 17. **block_answer_grid**: meestal null bij analyse; alleen invullen als er al een leerlingantwoord aanwezig is
 18. **block_max_height**: integer, standaard 5
 
@@ -39,7 +39,9 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 - Schrijf alles in het Nederlands
 - Gebruik kindvriendelijke taal voor de varianten
 - Als een oefening een 3D-blokkenbouwsel is, zet question_type op "blokken_bouwsel" en vul block_goal_grid, block_plan_grid, block_option_a_grid, block_option_b_grid en block_correct_option in
+- KRITIEK: block_plan_grid, block_goal_grid en het correcte optie-grid (A of B) MOETEN EXACT IDENTIEK zijn. Als block_correct_option "A" is, dan moeten block_plan_grid, block_goal_grid en block_option_a_grid PRECIES dezelfde 2D-array zijn.
 - Maak altijd precies twee verschillende 3D-opties (A en B); gebruik nooit dezelfde grid voor beide opties
+- De foutieve optie (de optie die NIET correct is) moet duidelijk anders zijn, maar wel plausibel (bijv. één toren hoger of lager)
 - De plattegrond moet in elk vakje een zichtbaar getal hebben (0 t/m block_max_height). Laat geen lege vakjes of alleen contouren zien
 - Voor blokkenbouwsel moet je VISUEEL uit de afbeelding lezen. Niet gokken op basis van alleen OCR-tekst.
 - Als je in één afbeelding meerdere blokkenbouwsels of varianten ziet, maak dan meerdere oefeningen (1 oefening per bouwsel/variant).

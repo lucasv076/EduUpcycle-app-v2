@@ -57,6 +57,7 @@ function StudentPreview({ exercise, onClose }) {
   const hardVariant = exercise.variants?.[1]; // { level: 'Moeilijker',  text: '...' }
   const hasVariants = !!(easyVariant && hardVariant);
   const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
+  const isBuildMode = isBlockQuestion && phase === 'hard';
 
   // Welke vraagstekst tonen we nu?
   const questionText = hasVariants
@@ -85,6 +86,7 @@ function StudentPreview({ exercise, onClose }) {
         maxHeight={exercise.block_max_height}
         sourceImageDataUrl={exercise.source_page_image_data_url}
         showSourceImage
+        buildMode={isBuildMode}
       />
     );
 
@@ -464,6 +466,7 @@ export default function EduUpcycleApp() {
     if (approved.length === 0) { setStep(3); return; }
 
     setSaving(true);
+    setError(null);
     try {
       const res = await fetch('/api/save-exercises', {
         method:  'POST',
@@ -472,15 +475,27 @@ export default function EduUpcycleApp() {
       });
       const data = await res.json();
 
+      if (!res.ok) {
+        throw new Error(data?.message || `Opslaan mislukt (HTTP ${res.status})`);
+      }
+
+      if (data?.error === 'NO_SUPABASE') {
+        setError('Supabase is niet geconfigureerd. Voeg SUPABASE_URL en SUPABASE_ANON_KEY toe en herstart de server.');
+        setSavedLinks([]);
+      } else if (data?.error && !data.saved?.length) {
+        throw new Error(data.message || 'Opslaan in Supabase is mislukt.');
+      }
+
       if (data.saved?.length > 0) {
         // Supabase werkt → sla links op voor de student-pagina
         setSavedLinks(data.saved.map(ex => ({ id: ex.id, title: ex.title })));
       } else {
-        // Supabase niet geconfigureerd of fout → alleen JSON export beschikbaar
+        // Geen opgeslagen records teruggekregen → alleen JSON export beschikbaar
         setSavedLinks([]);
       }
     } catch (err) {
       console.warn('Supabase opslaan mislukt:', err.message);
+      setError(`Opslaan naar Supabase mislukt: ${err.message}`);
       setSavedLinks([]);
     } finally {
       setSaving(false);
@@ -865,6 +880,29 @@ export default function EduUpcycleApp() {
                           </div>
                         ))}
                       </div>
+
+                      {selected.question_type === 'blokken_bouwsel' && (
+                        <>
+                          <SL style={{ marginTop: 12 }}>Blokkenbouwsel preview</SL>
+                          {selected.block_auto_generated && (
+                            <div style={{ background: '#FFF8DC', border: '1px solid #E5D8A0',
+                              borderRadius: 8, padding: '8px 12px', fontSize: 11,
+                              color: '#7A5500', marginBottom: 10 }}>
+                              ⚠ AI kon geen blokdata uit de PDF lezen — grids zijn automatisch gegenereerd.
+                              Controleer via "Leerlingweergave" vóór goedkeuren.
+                            </div>
+                          )}
+                          <BlokkenBouwselInteractive
+                            goalGrid={selected.block_goal_grid}
+                            planGrid={selected.block_plan_grid}
+                            optionAGrid={selected.block_option_a_grid}
+                            optionBGrid={selected.block_option_b_grid}
+                            correctOption={selected.block_correct_option}
+                            maxHeight={selected.block_max_height ?? 5}
+                            disabled
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
 

@@ -8,6 +8,37 @@
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
 
+function generateFallbackBlockGrids(maxH) {
+  const cap = Math.min(maxH, 3);
+  const rows = 3;
+  const cols = 3;
+
+  const goalGrid = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => Math.floor(Math.random() * (cap + 1)))
+  );
+  if (goalGrid.flat().every(v => v === 0)) goalGrid[1][1] = 1;
+
+  // Wrong option: identical copy with exactly one cell changed
+  const wrongGrid = goalGrid.map(r => [...r]);
+  let changed = false;
+  for (let y = 0; y < rows && !changed; y++) {
+    for (let x = 0; x < cols && !changed; x++) {
+      if (wrongGrid[y][x] > 0) {
+        wrongGrid[y][x] = wrongGrid[y][x] < cap ? wrongGrid[y][x] + 1 : wrongGrid[y][x] - 1;
+        changed = true;
+      }
+    }
+  }
+
+  const correctOption = Math.random() < 0.5 ? 'A' : 'B';
+  return {
+    optionA: correctOption === 'A' ? goalGrid : wrongGrid,
+    optionB: correctOption === 'B' ? goalGrid : wrongGrid,
+    correctOption,
+    planGrid: goalGrid,
+  };
+}
+
 function normalizeGrid(rawGrid, maxHeight = 5) {
   if (!Array.isArray(rawGrid) || rawGrid.length === 0) return null;
 
@@ -125,21 +156,43 @@ function normalizeExercise(exercise, index, sourcePages) {
     ? (parsedSourceFileType || 'pdf_tabel')
     : parsedSourceFileType;
 
-  const normalizedPlanGrid = question_type === 'blokken_bouwsel'
-    ? (block_plan_grid || block_goal_grid)
-    : block_plan_grid;
-
-  const normalizedOptionA = question_type === 'blokken_bouwsel'
-    ? block_option_a_grid
-    : block_option_a_grid;
-
-  const normalizedOptionB = question_type === 'blokken_bouwsel'
-    ? block_option_b_grid
-    : block_option_b_grid;
-
   const block_correct_option = question_type === 'blokken_bouwsel'
     ? (parsedCorrectOption === 'B' ? 'B' : 'A')
     : null;
+
+  // The plan shown to the student MUST match the correct option exactly.
+  // AI generates these independently so we enforce the invariant here.
+  const correctGrid = question_type === 'blokken_bouwsel'
+    ? (block_correct_option === 'B' ? block_option_b_grid : block_option_a_grid)
+    : null;
+
+  // Plan/goal grid: use the correct option's grid so they always match.
+  // Fall back to AI-supplied plan/goal only if we have no option grids at all.
+  const normalizedPlanGrid = question_type === 'blokken_bouwsel'
+    ? (correctGrid || block_plan_grid || block_goal_grid)
+    : block_plan_grid;
+
+  const normalizedGoalGrid = question_type === 'blokken_bouwsel'
+    ? (correctGrid || block_goal_grid || block_plan_grid)
+    : block_goal_grid;
+
+  // If AI didn't supply option grids, generate fallback grids so the exercise is usable.
+  let finalOptionA = block_option_a_grid;
+  let finalOptionB = block_option_b_grid;
+  let finalCorrectOption = block_correct_option;
+  let finalPlanGrid = normalizedPlanGrid;
+  let finalGoalGrid = normalizedGoalGrid;
+  let block_auto_generated = false;
+
+  if (question_type === 'blokken_bouwsel' && (!finalOptionA || !finalOptionB)) {
+    const fallback = generateFallbackBlockGrids(block_max_height);
+    finalOptionA = fallback.optionA;
+    finalOptionB = fallback.optionB;
+    finalCorrectOption = fallback.correctOption;
+    finalPlanGrid = fallback.planGrid;
+    finalGoalGrid = fallback.planGrid;
+    block_auto_generated = true;
+  }
 
   const title = typeof exercise?.title === 'string' && exercise.title.trim().length > 0
     ? exercise.title.trim()
@@ -182,12 +235,13 @@ function normalizeExercise(exercise, index, sourcePages) {
       : 'Open vraag',
     question_type,
     source_file_type,
-    block_goal_grid,
+    block_goal_grid: finalGoalGrid,
     block_answer_grid,
-    block_plan_grid: normalizedPlanGrid,
-    block_option_a_grid: normalizedOptionA,
-    block_option_b_grid: normalizedOptionB,
-    block_correct_option,
+    block_plan_grid: finalPlanGrid,
+    block_option_a_grid: finalOptionA,
+    block_option_b_grid: finalOptionB,
+    block_correct_option: finalCorrectOption,
+    block_auto_generated,
     block_max_height,
     confidence,
     difficulty: typeof exercise?.difficulty === 'string' && exercise.difficulty.trim().length > 0

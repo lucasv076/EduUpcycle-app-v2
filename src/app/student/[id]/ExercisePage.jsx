@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
-import { BlokkenBouwselInteractive } from '@/components/blokken-bouwsel';
+import { BlokkenBouwselInteractive, gridsEqual } from '@/components/blokken-bouwsel';
 
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -26,10 +26,20 @@ export default function ExercisePage({ exercise }) {
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
   const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
+  const isBuildMode = isBlockQuestion && phase === 'hard';
 
   const questionText = hasVariants
     ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
     : exercise.original;
+
+  // For block exercises, track whether the answer is actually correct
+  const isAnswerCorrect = submitted
+    ? isBuildMode
+      ? gridsEqual(answer, exercise.block_plan_grid)
+      : isBlockQuestion
+        ? answer === exercise.block_correct_option
+        : true
+    : null;
 
   const handleSubmit = () => setSubmitted(true);
 
@@ -51,8 +61,9 @@ export default function ExercisePage({ exercise }) {
         optionBGrid={exercise.block_option_b_grid}
         correctOption={exercise.block_correct_option}
         maxHeight={exercise.block_max_height}
-        onAnswered={(selectedOption) => setAnswer(selectedOption)}
+        onAnswered={(val) => setAnswer(val)}
         disabled={submitted}
+        buildMode={isBuildMode}
       />
     );
 
@@ -187,17 +198,27 @@ export default function ExercisePage({ exercise }) {
               </button>
             ) : (
               <div style={{ marginTop: 24 }}>
-                <div style={{ background: C.greenLight, borderRadius: 12, padding: '14px 18px',
-                  border: `1.5px solid ${C.green}`, marginBottom: 16 }}>
-                  <div style={{ fontWeight: 800, color: C.green, fontSize: 15, marginBottom: 4 }}>
-                    ✓ Goed gedaan!
+                {/* Build mode shows its own feedback inside BlokkenBouwselInteractive */}
+                {!isBuildMode && (
+                  <div style={{
+                    background: isAnswerCorrect === false ? C.redLight : C.greenLight,
+                    borderRadius: 12, padding: '14px 18px',
+                    border: `1.5px solid ${isAnswerCorrect === false ? C.red : C.green}`,
+                    marginBottom: 16,
+                  }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4,
+                      color: isAnswerCorrect === false ? C.red : C.green }}>
+                      {isAnswerCorrect === false ? '✗ Niet helemaal goed…' : '✓ Goed gedaan!'}
+                    </div>
+                    <div style={{ fontSize: 13, color: C.text }}>
+                      {isAnswerCorrect === false
+                        ? 'Kijk nog eens goed naar de plattegrond.'
+                        : phase === 'easy' && hasVariants
+                          ? 'Klaar voor de moeilijkere versie?'
+                          : 'Je hebt de oefening afgerond!'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 13, color: C.text }}>
-                    {phase === 'easy' && hasVariants
-                      ? 'Klaar voor de moeilijkere versie?'
-                      : 'Je hebt de oefening afgerond!'}
-                  </div>
-                </div>
+                )}
 
                 {phase === 'easy' && hasVariants && (
                   <button onClick={handleNextLevel}
@@ -212,7 +233,7 @@ export default function ExercisePage({ exercise }) {
                   <button onClick={handleDone}
                     style={{ background: C.green, color: 'white', border: 'none',
                       borderRadius: 10, padding: '13px 32px', fontWeight: 700,
-                      fontSize: 15, cursor: 'pointer' }}>
+                      fontSize: 15, cursor: 'pointer', marginTop: isBuildMode ? 12 : 0 }}>
                     🎉 Afronden
                   </button>
                 )}
