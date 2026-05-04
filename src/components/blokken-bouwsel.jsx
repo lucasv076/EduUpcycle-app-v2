@@ -97,7 +97,7 @@ function buildCubeFaces(grid) {
   });
 }
 
-function CubePreview({ grid }) {
+export function CubePreview({ grid }) {
   const faces = useMemo(() => buildCubeFaces(grid), [grid]);
 
   return (
@@ -114,7 +114,7 @@ function CubePreview({ grid }) {
   );
 }
 
-function PlanGridDisplay({ grid }) {
+export function PlanGridDisplay({ grid }) {
   const cols = grid[0]?.length || 0;
   return (
     <div style={{
@@ -140,7 +140,7 @@ function PlanGridDisplay({ grid }) {
 }
 
 // ── BlockBuilder: leerling bouwt zelf het 3D bouwsel ─────────────────
-function BlockBuilder({ planGrid, maxHeight, onAnswered, disabled }) {
+function BlockBuilder({ planGrid, maxHeight, onAnswered, disabled, showPlanHint = false }) {
   const rows = planGrid?.length || 3;
   const cols = planGrid?.[0]?.length || 3;
 
@@ -162,13 +162,15 @@ function BlockBuilder({ planGrid, maxHeight, onAnswered, disabled }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* Reference floor plan */}
-      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
-          Plattegrond — dit is jouw doel
+      {/* Reference floor plan — alleen tonen als hint gevraagd is */}
+      {showPlanHint && (
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+            Plattegrond — ter referentie
+          </div>
+          <PlanGridDisplay grid={planGrid} />
         </div>
-        <PlanGridDisplay grid={planGrid} />
-      </div>
+      )}
 
       {/* Interactive builder grid */}
       <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
@@ -286,6 +288,7 @@ export function BlokkenBouwselInteractive({
   showFeedback = true,
   disabled = false,
   buildMode = false,
+  showPlanHint = false,
 }) {
   const normalizedGoal = useMemo(() => clampGrid(goalGrid, maxHeight), [goalGrid, maxHeight]);
   const normalizedPlan = useMemo(() => clampGrid(planGrid, maxHeight), [planGrid, maxHeight]);
@@ -334,6 +337,7 @@ export function BlokkenBouwselInteractive({
         maxHeight={maxHeight}
         onAnswered={onAnswered}
         disabled={disabled}
+        showPlanHint={showPlanHint}
       />
     );
   }

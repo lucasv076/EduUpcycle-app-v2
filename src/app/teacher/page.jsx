@@ -5,7 +5,7 @@ import { C, TYPE_COLORS, confColor } from '@/lib/colors';
 import { DEMO_EXERCISES } from '@/lib/demo-data';
 import { extractPdfPages } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
-import { BlokkenBouwselInteractive } from '@/components/blokken-bouwsel';
+import { BlokkenBouwselInteractive, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
 const Badge = ({ label, bg, color, small }) => (
@@ -57,36 +57,128 @@ function StudentPreview({ exercise, onClose }) {
   const hardVariant = exercise.variants?.[1]; // { level: 'Moeilijker',  text: '...' }
   const hasVariants = !!(easyVariant && hardVariant);
   const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
-  const isBuildMode = isBlockQuestion && phase === 'hard';
+  const VALID_BLOCK_TYPES = ['tellen', 'goedFout', 'bouwen', 'meerkeuze'];
+  const blockInteractionType = isBlockQuestion
+    ? (VALID_BLOCK_TYPES.includes(exercise.block_interaction_type)
+        ? exercise.block_interaction_type
+        : (exercise.block_option_a_grid?.length && exercise.block_option_b_grid?.length
+            ? 'meerkeuze'
+            : 'goedFout'))
+    : null;
+  const isBuildMode    = blockInteractionType === 'bouwen';
+  const isTellenMode   = blockInteractionType === 'tellen';
+  const isGoedFoutMode = blockInteractionType === 'goedFout';
+  const isMeerkeuzMode = blockInteractionType === 'meerkeuze';
+  const maxH = exercise.block_max_height || 5;
 
-  // Welke vraagstekst tonen we nu?
   const questionText = hasVariants
     ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
     : exercise.original;
 
+  const blockTotalCount = isTellenMode && exercise.block_plan_grid
+    ? exercise.block_plan_grid.flat().reduce((s, v) => s + v, 0) : null;
+  const goedFoutCorrect = isGoedFoutMode
+    ? (exercise.block_correct_option === 'A' ? 'Goed' : 'Fout') : null;
+
   const handleSubmit = () => setSubmitted(true);
-
-  const handleNextLevel = () => {
-    setAnswer('');
-    setSubmitted(false);
-    setPhase('hard');
-  };
-
+  const handleNextLevel = () => { setAnswer(''); setSubmitted(false); setPhase('hard'); };
   const handleDone = () => setPhase('done');
 
-  // Input-component op basis van vraagtype
   const renderInput = () => {
-    if (isBlockQuestion) return (
+    if (isBlockQuestion && isTellenMode) {
+      const displayGrid = clampGrid(
+        exercise.block_goal_grid || exercise.block_plan_grid || exercise.block_option_a_grid, maxH);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {displayGrid.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>Bouwsel — tel alle blokjes</div>
+              <CubePreview grid={displayGrid} />
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 13, color: C.textMid }}>Aantal blokken:</label>
+            <input type="number" min="0" value={answer} onChange={e => setAnswer(e.target.value)}
+              disabled={submitted} placeholder="Voer het aantal in..."
+              style={{ border: `2px solid ${submitted ? C.green : C.border}`, borderRadius: 8,
+                padding: '10px 14px', fontSize: 16, maxWidth: 140, color: C.text,
+                background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
+          </div>
+        </div>
+      );
+    }
+
+    if (isBlockQuestion && isGoedFoutMode) {
+      const shownGrid = clampGrid(exercise.block_option_a_grid || exercise.block_goal_grid, maxH);
+      const planGrid  = clampGrid(exercise.block_plan_grid || exercise.block_goal_grid, maxH);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {shownGrid.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>Dit bouwsel</div>
+              <CubePreview grid={shownGrid} />
+            </div>
+          )}
+          {planGrid.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>Plattegrond (bovenaanzicht)</div>
+              <PlanGridDisplay grid={planGrid} />
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 10 }}>
+            {['Goed', 'Fout'].map(opt => (
+              <button key={opt} type="button" disabled={submitted}
+                onClick={() => !submitted && setAnswer(opt)}
+                style={{ flex: 1, padding: '12px 0', borderRadius: 10, fontSize: 15, fontWeight: 700,
+                  border: `2px solid ${answer === opt ? (opt === 'Goed' ? C.green : C.red) : C.border}`,
+                  background: answer === opt ? (opt === 'Goed' ? C.greenLight : C.redLight) : C.white,
+                  color: answer === opt ? (opt === 'Goed' ? C.green : C.red) : C.text,
+                  cursor: submitted ? 'default' : 'pointer' }}>
+                {opt === 'Goed' ? '✓ Goed' : '✗ Fout'}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (isBlockQuestion && isBuildMode) {
+      const targetGrid = clampGrid(exercise.block_goal_grid || exercise.block_plan_grid, maxH);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {targetGrid.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
+                Dit bouwsel moet je nabouwen — vul hieronder de plattegrond in
+              </div>
+              <CubePreview grid={targetGrid} />
+            </div>
+          )}
+          <BlokkenBouwselInteractive
+            goalGrid={exercise.block_goal_grid}
+            planGrid={exercise.block_plan_grid}
+            optionAGrid={exercise.block_option_a_grid}
+            optionBGrid={exercise.block_option_b_grid}
+            correctOption={exercise.block_correct_option}
+            maxHeight={maxH}
+            buildMode
+            showPlanHint={false}
+          />
+        </div>
+      );
+    }
+
+    if (isBlockQuestion && isMeerkeuzMode) return (
       <BlokkenBouwselInteractive
         goalGrid={exercise.block_goal_grid}
         planGrid={exercise.block_plan_grid}
         optionAGrid={exercise.block_option_a_grid}
         optionBGrid={exercise.block_option_b_grid}
         correctOption={exercise.block_correct_option}
-        maxHeight={exercise.block_max_height}
+        maxHeight={maxH}
         sourceImageDataUrl={exercise.source_page_image_data_url}
         showSourceImage
-        buildMode={isBuildMode}
+        buildMode={false}
       />
     );
 
@@ -792,11 +884,6 @@ export default function EduUpcycleApp() {
                         borderRadius: 8, padding: 12, fontSize: 12, color: C.blue, lineHeight: 1.55 }}>
                         💡 {selected.note}
                       </div>
-
-                      <SL>Illustratie</SL>
-                      <div style={{ marginBottom: 14 }}>
-                        <ExerciseIllustration type={selected.type} />
-                      </div>
                     </div>
 
                     {/* Right: AI output */}
@@ -881,28 +968,53 @@ export default function EduUpcycleApp() {
                         ))}
                       </div>
 
-                      {selected.question_type === 'blokken_bouwsel' && (
-                        <>
-                          <SL style={{ marginTop: 12 }}>Blokkenbouwsel preview</SL>
-                          {selected.block_auto_generated && (
-                            <div style={{ background: '#FFF8DC', border: '1px solid #E5D8A0',
-                              borderRadius: 8, padding: '8px 12px', fontSize: 11,
-                              color: '#7A5500', marginBottom: 10 }}>
-                              ⚠ AI kon geen blokdata uit de PDF lezen — grids zijn automatisch gegenereerd.
-                              Controleer via "Leerlingweergave" vóór goedkeuren.
-                            </div>
-                          )}
-                          <BlokkenBouwselInteractive
-                            goalGrid={selected.block_goal_grid}
-                            planGrid={selected.block_plan_grid}
-                            optionAGrid={selected.block_option_a_grid}
-                            optionBGrid={selected.block_option_b_grid}
-                            correctOption={selected.block_correct_option}
-                            maxHeight={selected.block_max_height ?? 5}
-                            disabled
-                          />
-                        </>
-                      )}
+                      {selected.question_type === 'blokken_bouwsel' && (() => {
+                        const sit = ['tellen','goedFout','bouwen','meerkeuze'].includes(selected.block_interaction_type)
+                          ? selected.block_interaction_type
+                          : (selected.block_option_a_grid?.length && selected.block_option_b_grid?.length ? 'meerkeuze' : 'goedFout');
+                        const smaxH = selected.block_max_height ?? 5;
+                        const previewGrid = clampGrid(
+                          selected.block_goal_grid || selected.block_plan_grid || selected.block_option_a_grid, smaxH);
+                        const previewPlan = clampGrid(selected.block_plan_grid || selected.block_goal_grid, smaxH);
+                        return (
+                          <>
+                            <SL style={{ marginTop: 12 }}>
+                              Blokkenbouwsel preview
+                              <span style={{ marginLeft: 8, fontWeight: 400, color: C.teal, textTransform: 'none', fontSize: 10 }}>
+                                ({sit})
+                              </span>
+                            </SL>
+                            {selected.block_auto_generated && (
+                              <div style={{ background: '#FFF8DC', border: '1px solid #E5D8A0',
+                                borderRadius: 8, padding: '8px 12px', fontSize: 11,
+                                color: '#7A5500', marginBottom: 10 }}>
+                                ⚠ AI kon geen blokdata uit de PDF lezen — grids zijn automatisch gegenereerd.
+                                Controleer via "Leerlingweergave" vóór goedkeuren.
+                              </div>
+                            )}
+                            {previewGrid.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
+                                    {sit === 'tellen' ? 'Bouwsel (leerling telt blokjes)' : '3D bouwsel'}
+                                  </div>
+                                  <CubePreview grid={previewGrid} />
+                                </div>
+                                {sit !== 'tellen' && previewPlan.length > 0 && (
+                                  <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
+                                    <div style={{ fontSize: 10, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>Plattegrond</div>
+                                    <PlanGridDisplay grid={previewPlan} />
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div style={{ background: C.redLight, color: C.red, borderRadius: 8, padding: 10, fontSize: 12 }}>
+                                Geen blokdata beschikbaar.
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 

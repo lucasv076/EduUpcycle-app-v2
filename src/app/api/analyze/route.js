@@ -152,6 +152,14 @@ function normalizeExercise(exercise, index, sourcePages) {
     ? exercise.block_correct_option.trim().toUpperCase()
     : null;
 
+  const blockInteractionTypeRaw = typeof exercise?.block_interaction_type === 'string'
+    ? exercise.block_interaction_type.trim().toLowerCase()
+    : null;
+  const VALID_INTERACTION_TYPES = ['tellen', 'goedFout', 'bouwen'];
+  const block_interaction_type = question_type === 'blokken_bouwsel'
+    ? (VALID_INTERACTION_TYPES.includes(blockInteractionTypeRaw) ? blockInteractionTypeRaw : 'goedFout')
+    : null;
+
   const source_file_type = question_type === 'blokken_bouwsel'
     ? (parsedSourceFileType || 'pdf_tabel')
     : parsedSourceFileType;
@@ -234,6 +242,7 @@ function normalizeExercise(exercise, index, sourcePages) {
         ? 'Blokkenbouwsel'
       : 'Open vraag',
     question_type,
+    block_interaction_type,
     source_file_type,
     block_goal_grid: finalGoalGrid,
     block_answer_grid,
