@@ -1,9 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
 import { BlokkenBouwselInteractive, gridsEqual } from '@/components/blokken-bouwsel';
+import SubmissionHistory from '@/components/SubmissionHistory';
+
+// Generate or retrieve a stable session ID
+function getSessionId() {
+  if (typeof window === 'undefined') return null;
+  let sessionId = localStorage.getItem('eduupcycle_session_id');
+  if (!sessionId) {
+    sessionId = 'student_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem('eduupcycle_session_id', sessionId);
+  }
+  return sessionId;
+}
 
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -21,6 +33,12 @@ export default function ExercisePage({ exercise }) {
   const [phase, setPhase]         = useState('easy');
   const [answer, setAnswer]       = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+
+  // Initialize session ID on mount
+  useEffect(() => {
+    setSessionId(getSessionId());
+  }, []);
 
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
@@ -40,6 +58,28 @@ export default function ExercisePage({ exercise }) {
         ? answer === exercise.block_correct_option
         : true
     : null;
+
+  // Save submission when answer is submitted
+  useEffect(() => {
+    if (submitted && sessionId && answer) {
+      const submittedGrid = isBlockQuestion ? answer : null;
+
+      fetch('/api/save-submission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exerciseId: exercise.id,
+          sessionId,
+          difficultyLevel: phase,
+          answer: isBlockQuestion ? null : answer,
+          isCorrect: isAnswerCorrect,
+          submittedGrid,
+        }),
+      }).catch(err => {
+        console.error('Failed to save submission:', err);
+      });
+    }
+  }, [submitted, sessionId, answer, exercise.id, isBlockQuestion, isAnswerCorrect, phase]);
 
   const handleSubmit = () => setSubmitted(true);
 
@@ -242,6 +282,8 @@ export default function ExercisePage({ exercise }) {
             )}
           </div>
         )}
+
+        <SubmissionHistory exerciseId={exercise.id} />
       </div>
     </div>
   );

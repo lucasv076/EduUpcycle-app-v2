@@ -114,14 +114,86 @@ export async function getExerciseById(id) {
 export async function getAllExercises() {
   if (!isConfigured()) throw new Error('Supabase niet geconfigureerd');
 
+  // Explicitly select all columns EXCEPT source_page_image_data_url (which is huge base64)
+  const cols = [
+    'id', 'created_at', 'title', 'original', 'type', 'question_type',
+    'confidence', 'difficulty', 'topic', 'format', 'note', 'variants',
+    'source_file_type', 'block_goal_grid', 'block_answer_grid', 'block_plan_grid',
+    'block_is_match', 'block_max_height', 'page', 'source_file',
+    'block_option_a_grid', 'block_option_b_grid', 'block_correct_option'
+  ].join(',');
+
   const res = await fetch(
-    `${URL_}/rest/v1/exercises?select=*&order=created_at.desc`,
-    { headers: baseHeaders(), next: { revalidate: 30 } }
+    `${URL_}/rest/v1/exercises?select=${cols}&order=created_at.desc`,
+    { headers: baseHeaders(), next: { revalidate: 0 } }
   );
 
   if (!res.ok) {
     const txt = await res.text().catch(() => res.statusText);
     throw new Error(`Supabase list fout (${res.status}): ${txt}`);
+  }
+
+  return res.json();
+}
+
+// ── Submission opslaan ────────────────────────────────────────────────
+// Slaat een student-antwoord op voor een oefening
+export async function saveSubmission(exerciseId, sessionId, difficultyLevel, answer, isCorrect, submittedGrid = null) {
+  if (!isConfigured()) return null; // Silent fail in demo mode
+
+  const payload = {
+    exercise_id: exerciseId,
+    session_id: sessionId,
+    difficulty_level: difficultyLevel,
+    answer: answer ?? null,
+    is_correct: isCorrect ?? null,
+    submitted_grid: submittedGrid ?? null,
+  };
+
+  const res = await fetch(`${URL_}/rest/v1/submissions`, {
+    method: 'POST',
+    headers: baseHeaders({ 'Prefer': 'return=representation' }),
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    console.error(`Submission save fout (${res.status}):`, await res.text().catch(() => res.statusText));
+    return null;
+  }
+
+  const rows = await res.json();
+  return rows[0] ?? null;
+}
+
+// ── Alle submissions voor een student ophalen ──────────────────────────
+export async function getSubmissionsBySession(sessionId) {
+  if (!isConfigured()) return [];
+
+  const res = await fetch(
+    `${URL_}/rest/v1/submissions?session_id=eq.${sessionId}&select=*&order=created_at.desc`,
+    { headers: baseHeaders(), next: { revalidate: 10 } }
+  );
+
+  if (!res.ok) {
+    console.error(`Submissions fetch fout (${res.status}):`, await res.text().catch(() => res.statusText));
+    return [];
+  }
+
+  return res.json();
+}
+
+// ── Submissions voor specifieke oefening ophalen ────────────────────────
+export async function getSubmissionsByExercise(exerciseId, sessionId) {
+  if (!isConfigured()) return [];
+
+  const res = await fetch(
+    `${URL_}/rest/v1/submissions?exercise_id=eq.${exerciseId}&session_id=eq.${sessionId}&select=*&order=created_at.desc`,
+    { headers: baseHeaders(), next: { revalidate: 10 } }
+  );
+
+  if (!res.ok) {
+    console.error(`Exercise submissions fetch fout (${res.status}):`, await res.text().catch(() => res.statusText));
+    return [];
   }
 
   return res.json();
