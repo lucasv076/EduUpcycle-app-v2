@@ -1,4 +1,4 @@
-// ── API Route: /api/analyze ─────────────────────────────────────────
+// ── API Route: /api/analyze ────────────────────────────────────
 // Ontvangt geëxtraheerde PDF-tekst en stuurt die naar Groq API
 // (OpenAI-compatible) om oefeningen te herkennen en te classificeren.
 //
