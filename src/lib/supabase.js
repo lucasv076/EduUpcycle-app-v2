@@ -66,6 +66,10 @@ export async function saveExercises(exercises) {
       ex.block_option_b_grid
       ?? ex.bouwsel_b_grid
       ?? null,
+    block_interaction_type:
+      ['tellen', 'goedFout', 'bouwen', 'meerkeuze'].includes(ex.block_interaction_type)
+        ? ex.block_interaction_type
+        : null,
     block_correct_option:
       String(ex.block_correct_option || '').trim().toUpperCase() === 'B'
         ? 'B'
@@ -114,26 +118,33 @@ export async function getExerciseById(id) {
 export async function getAllExercises() {
   if (!isConfigured()) throw new Error('Supabase niet geconfigureerd');
 
-  // Explicitly select all columns EXCEPT source_page_image_data_url (which is huge base64)
-  const cols = [
+  const BASE_COLS = [
     'id', 'created_at', 'title', 'original', 'type', 'question_type',
     'confidence', 'difficulty', 'topic', 'format', 'note', 'variants',
-    'source_file_type', 'block_goal_grid', 'block_answer_grid', 'block_plan_grid',
-    'block_is_match', 'block_max_height', 'page', 'source_file',
-    'block_option_a_grid', 'block_option_b_grid', 'block_correct_option'
-  ].join(',');
+    'source_file_type', 'block_goal_grid', 'block_answer_grid',
+    'block_plan_grid', 'block_is_match', 'block_max_height', 'page', 'source_file',
+    'block_option_a_grid', 'block_option_b_grid', 'block_correct_option',
+  ];
 
-  const res = await fetch(
-    `${URL_}/rest/v1/exercises?select=${cols}&order=created_at.desc`,
-    { headers: baseHeaders(), next: { revalidate: 0 } }
-  );
+  // Try with block_interaction_type first; fall back without it if the column doesn't exist yet
+  for (const cols of [
+    [...BASE_COLS, 'block_interaction_type'],
+    BASE_COLS,
+  ]) {
+    const res = await fetch(
+      `${URL_}/rest/v1/exercises?select=${cols.join(',')}&order=created_at.desc`,
+      { headers: baseHeaders(), next: { revalidate: 0 } }
+    );
 
-  if (!res.ok) {
+    if (res.ok) return res.json();
+
     const txt = await res.text().catch(() => res.statusText);
+
+    // If the column simply doesn't exist yet, retry without it
+    if (res.status === 400 && txt.includes('block_interaction_type')) continue;
+
     throw new Error(`Supabase list fout (${res.status}): ${txt}`);
   }
-
-  return res.json();
 }
 
 // ── Submission opslaan ────────────────────────────────────────────────

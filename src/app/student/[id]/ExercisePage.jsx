@@ -251,46 +251,76 @@ export default function ExercisePage({ exercise }) {
       />
     );
 
-    if (exercise.type === 'Invulvraag') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {exercise.source_page_image_data_url && (
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
-              Opdracht uit werkboek
+    if (exercise.type === 'Invulvraag') {
+      const blockGrid = exercise.block_goal_grid?.length > 0
+        ? clampGrid(exercise.block_goal_grid, maxH)
+        : exercise.block_plan_grid?.length > 0
+          ? clampGrid(exercise.block_plan_grid, maxH)
+          : null;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {blockGrid?.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Bouwsel — bekijk goed
+              </div>
+              <CubePreview grid={blockGrid} />
             </div>
-            <img src={exercise.source_page_image_data_url} alt="Opdracht"
-              style={{ width: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 6 }} />
-          </div>
-        )}
-        <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
-        <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
-          disabled={submitted} placeholder="Typ hier je antwoord..."
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`,
-            borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
-            color: C.text, background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
-      </div>
-    );
+          )}
+          {exercise.source_page_image_data_url && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
+                Opdracht uit werkboek
+              </div>
+              <img src={exercise.source_page_image_data_url} alt="Opdracht"
+                style={{ width: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 6 }} />
+            </div>
+          )}
+          <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
+          <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
+            disabled={submitted} placeholder="Typ hier je antwoord..."
+            style={{ border: `2px solid ${submitted ? C.green : C.border}`,
+              borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
+              color: C.text, background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
+        </div>
+      );
+    }
 
     if (exercise.type === 'Open vraag' || exercise.type === 'Tekenopgave'
-      || exercise.type === 'Manipulatieopdracht') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {exercise.source_page_image_data_url && (
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
-              Opdracht uit werkboek
+      || exercise.type === 'Manipulatieopdracht') {
+      const blockGrid = exercise.block_goal_grid?.length > 0
+        ? clampGrid(exercise.block_goal_grid, maxH)
+        : exercise.block_plan_grid?.length > 0
+          ? clampGrid(exercise.block_plan_grid, maxH)
+          : null;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {blockGrid?.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Bouwsel — bekijk goed
+              </div>
+              <CubePreview grid={blockGrid} />
             </div>
-            <img src={exercise.source_page_image_data_url} alt="Opdracht"
-              style={{ width: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 6 }} />
-          </div>
-        )}
-        <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
-        <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
-          placeholder="Schrijf je antwoord hier..." rows={5}
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`,
-            borderRadius: 10, padding: '12px 16px', fontSize: 15, resize: 'none',
-            color: C.text, fontFamily: 'inherit', maxWidth: 500 }} />
-      </div>
-    );
+          )}
+          {exercise.source_page_image_data_url && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
+                Opdracht uit werkboek
+              </div>
+              <img src={exercise.source_page_image_data_url} alt="Opdracht"
+                style={{ width: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 6 }} />
+            </div>
+          )}
+          <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
+          <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
+            placeholder="Schrijf je antwoord hier..." rows={5}
+            style={{ border: `2px solid ${submitted ? C.green : C.border}`,
+              borderRadius: 10, padding: '12px 16px', fontSize: 15, resize: 'none',
+              color: C.text, fontFamily: 'inherit', maxWidth: 500 }} />
+        </div>
+      );
+    }
 
     if (exercise.type === 'Meerkeuze') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
