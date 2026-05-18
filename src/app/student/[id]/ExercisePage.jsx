@@ -17,6 +17,33 @@ function getSessionId() {
   return sessionId;
 }
 
+const VAARDIGHEID_MAP = {
+  // Standaard types
+  'Open vraag':           'Je schrijft een antwoord in je eigen woorden.',
+  'Invulvraag':           'Je vult het juiste woord of getal in.',
+  'Meerkeuze':            'Je kiest het goede antwoord uit de opties.',
+  'Tekenopgave':          'Je maakt een tekening of schets.',
+  'Manipulatieopdracht':  'Je ordent, sorteert of verplaatst elementen.',
+  // Blokkenbouwsel per interactietype
+  'blokken_meerkeuze':    'Je herkent welk 3D-bouwsel bij de plattegrond hoort.',
+  'blokken_tellen':       'Je telt hoeveel blokjes er in het bouwsel zitten.',
+  'blokken_goedFout':     'Je controleert of het bouwsel klopt met de plattegrond.',
+  'blokken_bouwen':       'Je vult zelf de plattegrond in bij een 3D-bouwsel.',
+};
+
+function buildLeerdoel(topic, type, blockInteractionType) {
+  const parts = topic ? topic.split(/\s*[–—-]\s*/) : [];
+  const vak  = parts.length >= 2 ? parts[0].trim() : null;
+  const doel = parts.length >= 2 ? parts.slice(1).join(' – ').trim() : (topic || '');
+
+  const key = type === 'Blokkenbouwsel' && blockInteractionType
+    ? `blokken_${blockInteractionType}`
+    : type;
+  const vaardigheid = VAARDIGHEID_MAP[key] || null;
+
+  return { vak, doel, vaardigheid };
+}
+
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
     {[['z', C.orange], ['w', C.red], ['ij', C.blue], ['s', C.yellow], ['e', C.green], ['n', C.teal]].map(([l, bg]) => (
@@ -367,9 +394,45 @@ export default function ExercisePage({ exercise }) {
         </div>
 
         {/* Titel */}
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 20, lineHeight: 1.3 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 16, lineHeight: 1.3 }}>
           {exercise.title}
         </h1>
+
+        {/* Leerdoel-balk */}
+        {(() => {
+          const ld = buildLeerdoel(exercise.topic, exercise.type, blockInteractionType);
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12,
+              background: '#F0E8FB',
+              borderLeft: `5px solid ${C.purple}`,
+              borderRadius: 12,
+              border: `1.5px solid ${C.purple}`,
+              padding: '14px 18px',
+              marginBottom: 20,
+            }}>
+              <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>🎯</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Leerdoel
+                </div>
+                {ld.doel && (
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text, lineHeight: 1.4 }}>
+                    {ld.vak && (
+                      <span style={{ color: C.textMid, fontWeight: 600 }}>{ld.vak} &rsaquo; </span>
+                    )}
+                    {ld.doel}
+                  </div>
+                )}
+                {ld.vaardigheid && (
+                  <div style={{ fontSize: 13, color: C.textMid, fontWeight: 500, lineHeight: 1.4 }}>
+                    {ld.vaardigheid}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Niveau-indicator */}
         {hasVariants && phase !== 'done' && (

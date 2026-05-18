@@ -82,18 +82,27 @@ export async function saveExercises(exercises) {
     source_file: ex.source_file ?? null,
   }));
 
-  const res = await fetch(`${URL_}/rest/v1/exercises`, {
-    method:  'POST',
-    headers: baseHeaders({ 'Prefer': 'return=representation' }),
-    body:    JSON.stringify(rows),
-  });
+  const payloadVariants = [
+    rows,
+    rows.map(({ block_interaction_type, ...rest }) => rest),
+  ];
 
-  if (!res.ok) {
+  // First try with block_interaction_type; retry without it if the column is missing.
+  for (let i = 0; i < payloadVariants.length; i += 1) {
+    const res = await fetch(`${URL_}/rest/v1/exercises`, {
+      method:  'POST',
+      headers: baseHeaders({ 'Prefer': 'return=representation' }),
+      body:    JSON.stringify(payloadVariants[i]),
+    });
+
+    if (res.ok) return res.json();
+
     const txt = await res.text().catch(() => res.statusText);
+
+    if (i === 0 && res.status === 400 && txt.includes('block_interaction_type')) continue;
+
     throw new Error(`Supabase save fout (${res.status}): ${txt}`);
   }
-
-  return res.json(); // Array van opgeslagen rijen
 }
 
 // ── Één oefening ophalen op UUID ──────────────────────────────────────

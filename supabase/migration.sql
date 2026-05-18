@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS exercises (
   block_plan_grid JSONB,          -- 2D-array van de getoonde plattegrond in de vraag
   block_option_a_grid JSONB,      -- antwoordoptie A als 2D-array
   block_option_b_grid JSONB,      -- antwoordoptie B als 2D-array
+  block_interaction_type TEXT,     -- tellen | goedFout | bouwen | meerkeuze
   block_correct_option TEXT,      -- juiste optie: A of B
   block_is_match BOOLEAN,         -- correcte uitkomst voor goed/fout op de plattegrond
   block_max_height INTEGER NOT NULL DEFAULT 5,
@@ -81,6 +82,15 @@ CREATE TABLE IF NOT EXISTS exercises (
 
   ,CONSTRAINT exercises_block_max_height_chk
     CHECK (block_max_height BETWEEN 1 AND 20)
+
+  ,CONSTRAINT exercises_block_interaction_type_chk
+    CHECK (
+      (question_type <> 'blokken_bouwsel' AND block_interaction_type IS NULL)
+      OR (
+        question_type = 'blokken_bouwsel'
+        AND block_interaction_type IN ('tellen', 'goedFout', 'bouwen', 'meerkeuze')
+      )
+    )
 
   ,CONSTRAINT exercises_blokken_payload_chk
     CHECK (
@@ -112,6 +122,7 @@ ALTER TABLE exercises
   ADD COLUMN IF NOT EXISTS block_plan_grid JSONB,
   ADD COLUMN IF NOT EXISTS block_option_a_grid JSONB,
   ADD COLUMN IF NOT EXISTS block_option_b_grid JSONB,
+  ADD COLUMN IF NOT EXISTS block_interaction_type TEXT,
   ADD COLUMN IF NOT EXISTS block_correct_option TEXT,
   ADD COLUMN IF NOT EXISTS block_is_match BOOLEAN,
   ADD COLUMN IF NOT EXISTS block_max_height INTEGER NOT NULL DEFAULT 5,
@@ -156,6 +167,21 @@ BEGIN
     ALTER TABLE exercises
       ADD CONSTRAINT exercises_block_max_height_chk
       CHECK (block_max_height BETWEEN 1 AND 20);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'exercises_block_interaction_type_chk'
+  ) THEN
+    ALTER TABLE exercises
+      ADD CONSTRAINT exercises_block_interaction_type_chk
+      CHECK (
+        (question_type <> 'blokken_bouwsel' AND block_interaction_type IS NULL)
+        OR (
+          question_type = 'blokken_bouwsel'
+          AND block_interaction_type IN ('tellen', 'goedFout', 'bouwen', 'meerkeuze')
+        )
+      );
   END IF;
 
   IF NOT EXISTS (
