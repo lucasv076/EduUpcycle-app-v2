@@ -49,6 +49,7 @@ function StudentPreview({ exercise, onClose }) {
   const [phase, setPhase]       = useState('easy');
   const [answer, setAnswer]     = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [attempts, setAttempts] = useState(0);
 
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
@@ -62,11 +63,15 @@ function StudentPreview({ exercise, onClose }) {
 
   const isCorrect = submitted ? checkAnswer(answer, correctAnswer, exercise.type) : null;
 
-  const handleSubmit = () => setSubmitted(true);
+  const handleSubmit = () => {
+    setSubmitted(true);
+    setAttempts(a => a + 1);
+  };
 
   const handleNextLevel = () => {
     setAnswer('');
     setSubmitted(false);
+    setAttempts(0);
     setPhase('hard');
   };
 
@@ -93,7 +98,7 @@ function StudentPreview({ exercise, onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {displayOptions.map((opt, i) => {
             const isSelected = answer === opt;
-            const isRight    = submitted && opt === correctAnswer;
+            const isRight    = submitted && opt === correctAnswer && (isCorrect === true || attempts >= 2);
             const isWrong    = submitted && isSelected && opt !== correctAnswer;
             return (
               <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
@@ -227,21 +232,29 @@ function StudentPreview({ exercise, onClose }) {
                     </div>
                   )}
 
-                  {isCorrect === false && (
-                    <div style={{ background: '#FFEBEE', borderRadius: 10, padding: '12px 16px',
-                      border: '1.5px solid #E53935', marginBottom: 14 }}>
-                      <div style={{ fontWeight: 700, color: '#C62828', marginBottom: 6 }}>✗ Niet helemaal…</div>
-                      <div style={{ fontSize: 13, color: C.text, marginBottom: explanation ? 6 : 0 }}>
-                        Het juiste antwoord is: <strong style={{ color: '#2E7D32' }}>{correctAnswer}</strong>
-                      </div>
-                      {explanation && (
-                        <div style={{ fontSize: 13, color: C.text, background: 'white',
-                          borderRadius: 6, padding: '8px 10px', borderLeft: `3px solid ${C.purple}` }}>
-                          💡 {explanation}
+                  {isCorrect === false && (() => {
+                    const showAnswer = attempts >= 2;
+                    return (
+                      <div style={{ background: '#FFEBEE', borderRadius: 10, padding: '12px 16px',
+                        border: '1.5px solid #E53935', marginBottom: 14 }}>
+                        <div style={{ fontWeight: 700, color: '#C62828', marginBottom: 6 }}>
+                          {showAnswer ? '✗ Helaas, dat was het niet.' : '✗ Niet helemaal… Probeer het nog eens!'}
                         </div>
-                      )}
-                    </div>
-                  )}
+                        {explanation && (
+                          <div style={{ fontSize: 13, color: C.text, background: 'white',
+                            borderRadius: 6, padding: '8px 10px', marginBottom: showAnswer ? 6 : 0,
+                            borderLeft: `3px solid ${C.purple}` }}>
+                            💡 {explanation}
+                          </div>
+                        )}
+                        {showAnswer && (
+                          <div style={{ fontSize: 13, color: C.text }}>
+                            Het juiste antwoord is: <strong style={{ color: '#2E7D32' }}>{correctAnswer}</strong>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {isCorrect === null && (
                     <div style={{ background: C.greenLight, borderRadius: 10, padding: '12px 16px',
