@@ -91,6 +91,13 @@ eduurcycle/
 └── .gitignore
 ```
 
+## Blokkenbouwsel schema (Pilot 1)
+
+Voor het vraagtype `blokken_bouwsel` inclusief `doel_grid` en `antwoord_grid`:
+
+- Database migratie: `supabase/migration.sql`
+- ER-diagram en velduitleg: `docs/database-diagram-blokkenbouwsel.md`
+
 ## Groq API key aanmaken
 
 1. Ga naar [console.groq.com](https://console.groq.com)

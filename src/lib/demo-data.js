@@ -21,6 +21,7 @@ export const DEMO_EXERCISES = [
       { level: 'Makkelijker', text: 'Welke van deze getallen kun je als vierkant tekenen? Kies uit: 1, 4, 7, 9, 11.' },
       { level: 'Moeilijker',  text: 'Welke getallen tot 50 kun je als vierkant tekenen? Leg uit hoe je dat weet.' },
     ],
+    source_page_image_data_url: null,
     status: null,
   },
   {
@@ -40,6 +41,7 @@ export const DEMO_EXERCISES = [
       { level: 'Makkelijker', text: 'Hoeveel hokjes heeft een vierkant van 2 × 2?' },
       { level: 'Moeilijker',  text: 'Hoeveel hokjes heeft het kleinste vierkant om getal 16 heen?' },
     ],
+    source_page_image_data_url: null,
     status: null,
   },
   {
@@ -60,6 +62,7 @@ export const DEMO_EXERCISES = [
       { level: 'Makkelijker', text: 'Je hebt 9 tegels. Kun je een vierkant maken? Hoeveel blijven er over?' },
       { level: 'Moeilijker',  text: 'Pak 30 tegels. Leg het grootste vierkant. Hoeveel gebruik je? Hoeveel blijven over?' },
     ],
+    source_page_image_data_url: null,
     status: null,
   },
   {
@@ -82,6 +85,7 @@ export const DEMO_EXERCISES = [
       { level: 'Makkelijker', text: 'Kleur een vierkant van 4 hokjes in het raster.' },
       { level: 'Moeilijker',  text: 'Maak met 6 vloertjes twee verschillende vierkanten. Lukt dat?' },
     ],
+    source_page_image_data_url: null,
     status: null,
   },
 ];
