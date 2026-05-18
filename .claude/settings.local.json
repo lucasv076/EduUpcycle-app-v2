@@ -7,7 +7,8 @@
       "mcp__Claude_in_Chrome__navigate",
       "mcp__Claude_in_Chrome__javascript_tool",
       "mcp__Claude_in_Chrome__read_network_requests",
-      "Bash(node -e \"try { const m = require\\('pdfjs-dist/package.json'\\); console.log\\(m.version\\); } catch\\(e\\) { console.log\\('not found:', e.message\\); }\")"
+      "Bash(node -e \"try { const m = require\\('pdfjs-dist/package.json'\\); console.log\\(m.version\\); } catch\\(e\\) { console.log\\('not found:', e.message\\); }\")",
+      "PowerShell(git push origin main 2>&1)"
     ]
   }
 }
