@@ -1,6 +1,6 @@
 // ── API Route: /api/analyze ─────────────────────────────────────────
-// Gebruikt de native Gemini generateContent API (niet de OAI-compat laag)
-// zodat multimodale afbeeldingen betrouwbaar werken via inline_data.
+// Gebruikt Groq via de OpenAI-compatible API voor AI-analyse van
+// werkboekpagina's. Ondersteunt zowel vision als text-only.
 
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
@@ -456,12 +456,12 @@ export async function POST(request) {
     }
 
     const data = await response.json();
-    // Native API response: candidates[0].content.parts[0].text
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Groq OpenAI-compatible response: choices[0].message.content
+    const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      const reason = data.candidates?.[0]?.finishReason || 'onbekend';
-      console.error('Geen content in Gemini response:', JSON.stringify(data).slice(0, 300));
+      const reason = data.choices?.[0]?.finish_reason || 'onbekend';
+      console.error('Geen content in Groq response:', JSON.stringify(data).slice(0, 300));
       return NextResponse.json(
         { error: 'NO_RESPONSE', message: `Geen antwoord van AI (reden: ${reason}).` },
         { status: 500 }
