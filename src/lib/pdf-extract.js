@@ -51,7 +51,7 @@ async function getPdfJs() {
 
   // Worker instellen (Vercel-compatible)
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
   return pdfjsLib;
 }
 
