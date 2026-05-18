@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -31,17 +31,20 @@ export async function POST(request) {
 
     // Bouw de parts op: tekst + afbeeldingen per pagina
     const parts = [
-      { text: "Analyseer de volgende werkboekpagina's uit een Zwijsen-werkboek en identificeer ALLE oefeningen en opdrachten. Lever het resultaat als JSON-array precies zoals beschreven." },
+      { text: "Analyseer de volgende werkboekpagina's uit een Zwijsen-werkboek en identificeer ALLE oefeningen en opdrachten. Sommige pagina's zijn ingescand — lees dan de tekst direct uit de afbeelding. Lever het resultaat als JSON-array precies zoals beschreven." },
     ];
 
     for (const p of pages) {
-      parts.push({ text: `--- PAGINA ${p.page} ---` });
+      const isScanned = !p.text || p.text.trim().length < 20;
+      parts.push({ text: `--- PAGINA ${p.page}${isScanned ? ' (ingescand — lees tekst uit afbeelding)' : ''} ---` });
 
       if (p.image && p.image.startsWith('data:')) {
-        // Haal mime-type en base64-data op uit de data-URL
         const [meta, b64] = p.image.split(',');
         const mime = meta.replace('data:', '').replace(';base64', '');
         parts.push({ inline_data: { mime_type: mime, data: b64 } });
+        if (p.text && p.text.trim().length >= 20) {
+          parts.push({ text: `Tekst (ter referentie): ${p.text.slice(0, 3000)}` });
+        }
       } else if (p.text) {
         parts.push({ text: p.text.slice(0, 3000) });
       }
@@ -52,7 +55,7 @@ export async function POST(request) {
       contents: [{ role: 'user', parts }],
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 65536,
       },
     });
 

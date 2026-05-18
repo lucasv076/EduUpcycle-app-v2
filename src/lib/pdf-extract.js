@@ -29,21 +29,17 @@ export async function extractPdfPages(file) {
       .replace(/\s+/g, ' ')
       .trim();
 
-    // ── Weergaveafbeelding (1.5x schaal) ──
+    // ── Weergave- én API-afbeelding (1.5x schaal, hoge kwaliteit voor ingescande PDFs) ──
     const viewport = page.getViewport({ scale: 1.5 });
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
-    // ── Kleinere versie voor API-aanroepen (0.7x schaal) ──
-    const apiViewport = page.getViewport({ scale: 0.7 });
-    const apiCanvas = document.createElement('canvas');
-    apiCanvas.width = apiViewport.width;
-    apiCanvas.height = apiViewport.height;
-    await page.render({ canvasContext: apiCanvas.getContext('2d'), viewport: apiViewport }).promise;
-    const apiImageDataUrl = apiCanvas.toDataURL('image/jpeg', 0.65);
+    // Gebruik dezelfde hoge kwaliteit voor de API — ingescande PDFs vereisen dit zodat
+    // de AI de tekst uit de afbeelding kan lezen (geen tekstlaag beschikbaar).
+    const apiImageDataUrl = imageDataUrl;
 
     pages.push({ page: i, text, imageDataUrl, apiImageDataUrl });
   }

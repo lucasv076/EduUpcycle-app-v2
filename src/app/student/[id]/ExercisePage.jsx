@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
+import { checkAnswer } from '@/lib/answer-validation';
 
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -14,9 +15,6 @@ const ZwijsenLogo = () => (
 );
 
 export default function ExercisePage({ exercise }) {
-  // phase: 'easy' → makkelijke variant
-  //        'hard' → moeilijke variant
-  //        'done' → klaar!
   const [phase, setPhase]         = useState('easy');
   const [answer, setAnswer]       = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -25,9 +23,13 @@ export default function ExercisePage({ exercise }) {
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
 
-  const questionText = hasVariants
-    ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
-    : exercise.original;
+  const currentVariant = phase === 'hard' ? hardVariant : easyVariant;
+  const questionText   = hasVariants ? currentVariant?.text : exercise.original;
+  const correctAnswer  = currentVariant?.answer || '';
+  const explanation    = currentVariant?.explanation || '';
+  const options        = currentVariant?.options || [];
+
+  const isCorrect = submitted ? checkAnswer(answer, correctAnswer, exercise.type) : null;
 
   const handleSubmit = () => setSubmitted(true);
 
@@ -37,23 +39,63 @@ export default function ExercisePage({ exercise }) {
     setPhase('hard');
   };
 
+  const handleRetry = () => {
+    setAnswer('');
+    setSubmitted(false);
+  };
+
   const handleDone = () => setPhase('done');
 
-  // ── Input op basis van vraagtype ────────────────────────────────────
+  // Auto-advance naar moeilijker bij goed antwoord (na 2s)
+  useEffect(() => {
+    if (submitted && isCorrect === true && phase === 'easy' && hasVariants) {
+      const t = setTimeout(handleNextLevel, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [submitted, isCorrect, phase, hasVariants]);
+
+  // ── Input op basis van vraagtype ──────────────────────────────────────
   const renderInput = () => {
+    if (exercise.type === 'Meerkeuze') {
+      const displayOptions = options.length >= 2 ? options : ['Optie A', 'Optie B', 'Optie C', 'Optie D'];
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
+          {displayOptions.map((opt, i) => {
+            const isSelected = answer === opt;
+            const isRight    = submitted && opt === correctAnswer;
+            const isWrong    = submitted && isSelected && opt !== correctAnswer;
+            return (
+              <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
+                style={{ textAlign: 'left', padding: '13px 18px', borderRadius: 10, fontSize: 15,
+                  border: `2px solid ${isRight ? C.green : isWrong ? '#E53935' : isSelected ? C.purple : C.border}`,
+                  background: isRight ? C.greenLight : isWrong ? '#FFEBEE' : isSelected ? C.purpleLight : C.white,
+                  color: C.text, fontWeight: isSelected ? 700 : 400,
+                  cursor: submitted ? 'default' : 'pointer' }}>
+                {String.fromCharCode(65 + i)}. {opt}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
     if (exercise.type === 'Invulvraag') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
         <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
           disabled={submitted} placeholder="Typ hier je antwoord..."
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`,
-            borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
-            color: C.text, background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
+          onKeyDown={e => e.key === 'Enter' && answer && !submitted && handleSubmit()}
+          style={{ border: `2px solid ${
+            submitted ? (isCorrect === false ? '#E53935' : C.green) : C.border
+          }`, borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
+            color: C.text,
+            background: submitted ? (isCorrect === false ? '#FFEBEE' : C.greenLight) : C.white,
+            fontFamily: 'inherit' }} />
       </div>
     );
 
-    if (exercise.type === 'Open vraag' || exercise.type === 'Tekenopgave'
-      || exercise.type === 'Manipulatieopdracht') return (
+    // Open vraag / Tekenopgave / Manipulatieopdracht
+    return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
         <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
@@ -63,22 +105,55 @@ export default function ExercisePage({ exercise }) {
             color: C.text, fontFamily: 'inherit', maxWidth: 500 }} />
       </div>
     );
+  };
 
-    if (exercise.type === 'Meerkeuze') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
-        {['Antwoord A', 'Antwoord B', 'Antwoord C', 'Antwoord D'].map((opt, i) => (
-          <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
-            style={{ textAlign: 'left', padding: '13px 18px', borderRadius: 10, fontSize: 15,
-              border: `2px solid ${answer === opt ? C.purple : C.border}`,
-              background: answer === opt ? C.purpleLight : C.white, color: C.text,
-              fontWeight: answer === opt ? 700 : 400, cursor: submitted ? 'default' : 'pointer' }}>
-            {String.fromCharCode(65 + i)}. {opt}
-          </button>
-        ))}
+  // ── Feedback na inleveren ─────────────────────────────────────────────
+  const renderFeedback = () => {
+    if (isCorrect === true) {
+      return (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: '14px 18px',
+          border: `1.5px solid ${C.green}`, marginBottom: 16 }}>
+          <div style={{ fontWeight: 800, color: C.green, fontSize: 15, marginBottom: explanation ? 4 : 0 }}>
+            ✓ Goed gedaan!
+          </div>
+          {explanation && <div style={{ fontSize: 13, color: C.text, marginBottom: 4 }}>{explanation}</div>}
+          <div style={{ fontSize: 12, color: C.textMid, fontStyle: 'italic' }}>
+            {phase === 'easy' && hasVariants ? 'Door naar moeilijker…' : 'Je hebt de oefening afgerond!'}
+          </div>
+        </div>
+      );
+    }
+
+    if (isCorrect === false) {
+      return (
+        <div style={{ background: '#FFEBEE', borderRadius: 12, padding: '14px 18px',
+          border: '1.5px solid #E53935', marginBottom: 16 }}>
+          <div style={{ fontWeight: 800, color: '#C62828', fontSize: 15, marginBottom: 6 }}>✗ Niet helemaal…</div>
+          <div style={{ fontSize: 13, color: C.text, marginBottom: explanation ? 8 : 0 }}>
+            Het goede antwoord is: <strong style={{ color: '#2E7D32' }}>{correctAnswer}</strong>
+          </div>
+          {explanation && (
+            <div style={{ fontSize: 13, color: C.text, background: 'white',
+              borderRadius: 8, padding: '10px 12px', borderLeft: `3px solid ${C.purple}` }}>
+              💡 {explanation}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: '14px 18px',
+        border: `1.5px solid ${C.green}`, marginBottom: 16 }}>
+        <div style={{ fontWeight: 800, color: C.green, fontSize: 15, marginBottom: 4 }}>✓ Ingeleverd!</div>
+        {correctAnswer && correctAnswer !== 'n.v.t.' && (
+          <div style={{ fontSize: 13, color: C.text, marginBottom: explanation ? 4 : 0 }}>
+            Voorbeeldantwoord: <strong>{correctAnswer}</strong>
+          </div>
+        )}
+        {explanation && <div style={{ fontSize: 13, color: C.text }}>💡 {explanation}</div>}
       </div>
     );
-
-    return null;
   };
 
   return (
@@ -170,19 +245,33 @@ export default function ExercisePage({ exercise }) {
               </button>
             ) : (
               <div style={{ marginTop: 24 }}>
-                <div style={{ background: C.greenLight, borderRadius: 12, padding: '14px 18px',
-                  border: `1.5px solid ${C.green}`, marginBottom: 16 }}>
-                  <div style={{ fontWeight: 800, color: C.green, fontSize: 15, marginBottom: 4 }}>
-                    ✓ Goed gedaan!
-                  </div>
-                  <div style={{ fontSize: 13, color: C.text }}>
-                    {phase === 'easy' && hasVariants
-                      ? 'Klaar voor de moeilijkere versie?'
-                      : 'Je hebt de oefening afgerond!'}
-                  </div>
-                </div>
+                {renderFeedback()}
 
-                {phase === 'easy' && hasVariants && (
+                {isCorrect === false && (
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button onClick={handleRetry}
+                      style={{ background: C.purple, color: 'white', border: 'none',
+                        borderRadius: 10, padding: '13px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                      ↻ Opnieuw proberen
+                    </button>
+                    {phase === 'easy' && hasVariants && (
+                      <button onClick={handleNextLevel}
+                        style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
+                          borderRadius: 10, padding: '13px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                        Toch verder →
+                      </button>
+                    )}
+                    {phase === 'hard' && (
+                      <button onClick={handleDone}
+                        style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
+                          borderRadius: 10, padding: '13px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                        Toch afronden →
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {isCorrect !== false && phase === 'easy' && hasVariants && (
                   <button onClick={handleNextLevel}
                     style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`,
                       color: 'white', border: 'none', borderRadius: 10,
@@ -191,7 +280,7 @@ export default function ExercisePage({ exercise }) {
                   </button>
                 )}
 
-                {phase === 'hard' && (
+                {isCorrect !== false && phase === 'hard' && (
                   <button onClick={handleDone}
                     style={{ background: C.green, color: 'white', border: 'none',
                       borderRadius: 10, padding: '13px 32px', fontWeight: 700,

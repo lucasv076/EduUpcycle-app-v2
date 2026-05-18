@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { C, TYPE_COLORS, confColor } from '@/lib/colors';
 import { DEMO_EXERCISES } from '@/lib/demo-data';
 import { extractPdfPages } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
+import { checkAnswer } from '@/lib/answer-validation';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
 const Badge = ({ label, bg, color, small }) => (
@@ -45,21 +46,21 @@ const PROC = [
 
 // ── Student Preview Modal ─────────────────────────────────────────────
 function StudentPreview({ exercise, onClose }) {
-  // phase: 'easy' → leerling maakt de makkelijke variant
-  //        'hard' → leerling maakt de moeilijke variant
-  //        'done' → beide niveaus afgerond
   const [phase, setPhase]       = useState('easy');
   const [answer, setAnswer]     = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const easyVariant = exercise.variants?.[0]; // { level: 'Makkelijker', text: '...' }
-  const hardVariant = exercise.variants?.[1]; // { level: 'Moeilijker',  text: '...' }
+  const easyVariant = exercise.variants?.[0];
+  const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
 
-  // Welke vraagstekst tonen we nu?
-  const questionText = hasVariants
-    ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
-    : exercise.original;
+  const currentVariant = phase === 'hard' ? hardVariant : easyVariant;
+  const questionText   = hasVariants ? currentVariant?.text : exercise.original;
+  const correctAnswer  = currentVariant?.answer || '';
+  const explanation    = currentVariant?.explanation || '';
+  const options        = currentVariant?.options || [];
+
+  const isCorrect = submitted ? checkAnswer(answer, correctAnswer, exercise.type) : null;
 
   const handleSubmit = () => setSubmitted(true);
 
@@ -69,22 +70,62 @@ function StudentPreview({ exercise, onClose }) {
     setPhase('hard');
   };
 
+  const handleRetry = () => {
+    setAnswer('');
+    setSubmitted(false);
+  };
+
   const handleDone = () => setPhase('done');
+
+  // Auto-advance naar moeilijker bij goed antwoord (na 2s)
+  useEffect(() => {
+    if (submitted && isCorrect === true && phase === 'easy' && hasVariants) {
+      const t = setTimeout(handleNextLevel, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [submitted, isCorrect, phase, hasVariants]);
 
   // Input-component op basis van vraagtype
   const renderInput = () => {
+    if (exercise.type === 'Meerkeuze') {
+      const displayOptions = options.length >= 2 ? options : ['Optie A', 'Optie B', 'Optie C', 'Optie D'];
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {displayOptions.map((opt, i) => {
+            const isSelected = answer === opt;
+            const isRight    = submitted && opt === correctAnswer;
+            const isWrong    = submitted && isSelected && opt !== correctAnswer;
+            return (
+              <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
+                style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 8, fontSize: 14,
+                  border: `2px solid ${isRight ? C.green : isWrong ? '#E53935' : isSelected ? C.purple : C.border}`,
+                  background: isRight ? C.greenLight : isWrong ? '#FFEBEE' : isSelected ? C.purpleLight : C.white,
+                  color: C.text, fontWeight: isSelected ? 600 : 400,
+                  cursor: submitted ? 'default' : 'pointer' }}>
+                {String.fromCharCode(65 + i)}. {opt}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
     if (exercise.type === 'Invulvraag') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label style={{ fontSize: 13, color: C.textMid }}>Jouw antwoord:</label>
         <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
           disabled={submitted} placeholder="Typ hier je antwoord..."
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`, borderRadius: 8,
-            padding: '10px 14px', fontSize: 16, width: 220, color: C.text,
-            background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
+          onKeyDown={e => e.key === 'Enter' && answer && !submitted && handleSubmit()}
+          style={{ border: `2px solid ${
+            submitted ? (isCorrect === false ? '#E53935' : C.green) : C.border
+          }`, borderRadius: 8, padding: '10px 14px', fontSize: 16, width: 220, color: C.text,
+            background: submitted ? (isCorrect === false ? '#FFEBEE' : C.greenLight) : C.white,
+            fontFamily: 'inherit' }} />
       </div>
     );
 
-    if (exercise.type === 'Open vraag' || exercise.type === 'Tekenopgave') return (
+    // Open vraag / Tekenopgave / Manipulatieopdracht
+    return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label style={{ fontSize: 13, color: C.textMid }}>Jouw antwoord:</label>
         <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
@@ -93,32 +134,6 @@ function StudentPreview({ exercise, onClose }) {
             padding: '10px 14px', fontSize: 14, resize: 'none', color: C.text, fontFamily: 'inherit' }} />
       </div>
     );
-
-    if (exercise.type === 'Meerkeuze') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {['Antwoord A', 'Antwoord B', 'Antwoord C', 'Antwoord D'].map((opt, i) => (
-          <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
-            style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 8, fontSize: 14,
-              border: `2px solid ${answer === opt ? C.purple : C.border}`,
-              background: answer === opt ? C.purpleLight : C.white, color: C.text,
-              fontWeight: answer === opt ? 600 : 400 }}>
-            {String.fromCharCode(65 + i)}. {opt}
-          </button>
-        ))}
-      </div>
-    );
-
-    if (exercise.type === 'Manipulatieopdracht') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ fontSize: 13, color: C.textMid }}>Jouw antwoord:</label>
-        <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
-          placeholder="Beschrijf wat je hebt gedaan..." rows={3}
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`, borderRadius: 8,
-            padding: '10px 14px', fontSize: 14, resize: 'none', color: C.text, fontFamily: 'inherit' }} />
-      </div>
-    );
-
-    return null;
   };
 
   return (
@@ -199,20 +214,70 @@ function StudentPreview({ exercise, onClose }) {
                 </button>
               ) : (
                 <div style={{ marginTop: 20 }}>
-                  <div style={{ background: C.greenLight, borderRadius: 10, padding: '12px 16px',
-                    border: `1.5px solid ${C.green}`, marginBottom: 14 }}>
-                    <div style={{ fontWeight: 700, color: C.green, marginBottom: 4 }}>✓ Goed gedaan!</div>
-                    <div style={{ fontSize: 13, color: C.text }}>
-                      {phase === 'easy' && hasVariants
-                        ? 'Klaar voor de moeilijkere versie?'
-                        : 'Je hebt de oefening afgerond.'}
+                  {isCorrect === true && (
+                    <div style={{ background: C.greenLight, borderRadius: 10, padding: '12px 16px',
+                      border: `1.5px solid ${C.green}`, marginBottom: 14 }}>
+                      <div style={{ fontWeight: 700, color: C.green, marginBottom: explanation ? 4 : 0 }}>✓ Goed gedaan!</div>
+                      {explanation && <div style={{ fontSize: 13, color: C.text, marginBottom: 4 }}>{explanation}</div>}
+                      <div style={{ fontSize: 12, color: C.textMid, fontStyle: 'italic' }}>
+                        {phase === 'easy' && hasVariants
+                          ? 'Door naar moeilijker…'
+                          : 'Je hebt de oefening afgerond!'}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {phase === 'easy' && hasVariants && (
+                  {isCorrect === false && (
+                    <div style={{ background: '#FFEBEE', borderRadius: 10, padding: '12px 16px',
+                      border: '1.5px solid #E53935', marginBottom: 14 }}>
+                      <div style={{ fontWeight: 700, color: '#C62828', marginBottom: 6 }}>✗ Niet helemaal…</div>
+                      <div style={{ fontSize: 13, color: C.text, marginBottom: explanation ? 6 : 0 }}>
+                        Het juiste antwoord is: <strong style={{ color: '#2E7D32' }}>{correctAnswer}</strong>
+                      </div>
+                      {explanation && (
+                        <div style={{ fontSize: 13, color: C.text, background: 'white',
+                          borderRadius: 6, padding: '8px 10px', borderLeft: `3px solid ${C.purple}` }}>
+                          💡 {explanation}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {isCorrect === null && (
+                    <div style={{ background: C.greenLight, borderRadius: 10, padding: '12px 16px',
+                      border: `1.5px solid ${C.green}`, marginBottom: 14 }}>
+                      <div style={{ fontWeight: 700, color: C.green, marginBottom: 4 }}>✓ Ingeleverd!</div>
+                      {correctAnswer && correctAnswer !== 'n.v.t.' && (
+                        <div style={{ fontSize: 13, color: C.text, marginBottom: explanation ? 4 : 0 }}>
+                          Voorbeeldantwoord: <strong>{correctAnswer}</strong>
+                        </div>
+                      )}
+                      {explanation && <div style={{ fontSize: 13, color: C.text }}>💡 {explanation}</div>}
+                    </div>
+                  )}
+
+                  {/* Knoppen */}
+                  {isCorrect === false && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={handleRetry}
+                        style={{ background: C.purple, color: 'white', border: 'none',
+                          borderRadius: 8, padding: '11px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                        ↻ Opnieuw proberen
+                      </button>
+                      {phase === 'easy' && hasVariants && (
+                        <button onClick={handleNextLevel}
+                          style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
+                            borderRadius: 8, padding: '11px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                          Toch verder →
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {isCorrect !== false && phase === 'easy' && hasVariants && (
                     <button onClick={handleNextLevel}
                       style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`, color: 'white',
-                        border: 'none', borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
+                        border: 'none', borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                       Moeilijkere versie proberen →
                     </button>
                   )}
@@ -220,7 +285,7 @@ function StudentPreview({ exercise, onClose }) {
                   {phase === 'hard' && (
                     <button onClick={handleDone}
                       style={{ background: C.green, color: 'white', border: 'none',
-                        borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
+                        borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                       🎉 Afronden
                     </button>
                   )}
@@ -309,8 +374,8 @@ export default function EduUpcycleApp() {
       await new Promise(r => setTimeout(r, 400));
 
       // Stap 3: AI analyse — altijd vision-modus zodat Gemini de pagina echt ziet
-      // CHUNK_SIZE=3: houdt request-grootte klein voor gratis tier
-      const CHUNK_SIZE = 3;
+      // CHUNK_SIZE=2: kleiner voor ingescande PDFs (grote afbeeldingen, meer tokens nodig)
+      const CHUNK_SIZE = 2;
       const sourcePages = allPages;
 
       const pageChunks = [];
@@ -322,8 +387,9 @@ export default function EduUpcycleApp() {
       setProcIdx(2);
       let allExercises = [];
       let resultMode = 'ai';
+      let skippedChunks = 0;
 
-            // 5 seconden wachten tussen chunks: gratis tier = max 15 req/min
+      // 5 seconden wachten tussen chunks: gratis tier = max 15 req/min
       const CHUNK_DELAY_MS = 5000;
       let rateLimitHits = 0;
 
@@ -339,18 +405,27 @@ export default function EduUpcycleApp() {
 
         setProcMsg(`AI analyseert pagina's ${p1}–${p2} (deel ${ci + 1} van ${pageChunks.length})…`);
 
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pages: chunk.map(p => ({
-              page: p.page,
-              text: p.text,
-              fileName: p.fileName,
-              image: p.apiImageDataUrl,
-            })),
-          }),
-        });
+        let response;
+        try {
+          response = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pages: chunk.map(p => ({
+                page: p.page,
+                text: p.text,
+                fileName: p.fileName,
+                image: p.apiImageDataUrl,
+              })),
+            }),
+          });
+        } catch (fetchErr) {
+          // Netwerkfout of timeout — sla chunk over
+          setProcMsg(`⚠ Pagina's ${p1}–${p2} timeout — overgeslagen`);
+          await new Promise(r => setTimeout(r, 1000));
+          skippedChunks++;
+          continue;
+        }
 
         if (!response.ok) {
           const err = await response.json().catch(() => ({}));
@@ -363,13 +438,12 @@ export default function EduUpcycleApp() {
           } else if (err.error === 'CONTEXT_TOO_LONG') {
             setProcMsg(`Pagina's ${p1}–${p2} te lang voor AI — overgeslagen`);
             await new Promise(r => setTimeout(r, 800));
+            skippedChunks++;
           } else if (err.error === 'RATE_LIMIT') {
-            // Extra wachttijd en opnieuw proberen
             setProcMsg(`Rate limit bereikt — 15 seconden wachten…`);
             await new Promise(r => setTimeout(r, 15000));
             rateLimitHits++;
             if (rateLimitHits >= 3) {
-              // Quota op — val terug op demo-modus
               setProcMsg('Dagelijkse quota bereikt — demo-modus laden…');
               await new Promise(r => setTimeout(r, 800));
               allExercises = DEMO_EXERCISES;
@@ -380,7 +454,10 @@ export default function EduUpcycleApp() {
             await new Promise(r => setTimeout(r, 20000));
             ci--; // zelfde chunk opnieuw
           } else {
-            throw new Error(err.message || `API fout bij pagina's ${p1}–${p2}`);
+            // Andere API-fout — sla chunk over in plaats van alles te stoppen
+            setProcMsg(`⚠ Pagina's ${p1}–${p2} konden niet worden verwerkt — overgeslagen`);
+            await new Promise(r => setTimeout(r, 1000));
+            skippedChunks++;
           }
         } else {
           rateLimitHits = 0; // succesvolle aanroep reset de teller
