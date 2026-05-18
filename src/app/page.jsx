@@ -1,951 +1,138 @@
-'use client';
-
-import { useState, useCallback, useRef } from 'react';
-import { C, TYPE_COLORS, confColor } from '@/lib/colors';
-import { DEMO_EXERCISES } from '@/lib/demo-data';
-import { extractPdfPages } from '@/lib/pdf-extract';
-import { ExerciseIllustration } from '@/components/illustrations';
-
-// ── Tiny helpers ──────────────────────────────────────────────────────
-const Badge = ({ label, bg, color, small }) => (
-  <span style={{ background: bg, color, fontSize: small ? 10 : 11, fontWeight: 700,
-    padding: small ? '2px 6px' : '3px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>
-    {label}
-  </span>
-);
-
-const SL = ({ children }) => (
-  <div style={{ fontSize: 10, fontWeight: 800, color: C.textLight, textTransform: 'uppercase',
-    letterSpacing: 1, marginBottom: 8, marginTop: 4 }}>{children}</div>
-);
-
-const IB = ({ children }) => (
-  <div style={{ background: C.purpleBg, borderRadius: 8, padding: 12, marginBottom: 10 }}>{children}</div>
-);
+import Link from 'next/link';
+import { C } from '@/lib/colors';
 
 const ZwijsenLogo = ({ size = 14 }) => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
     {[['z', C.orange], ['w', C.red], ['ij', C.blue], ['s', C.yellow], ['e', C.green], ['n', C.teal]].map(([l, bg]) => (
-      <span key={l} style={{ background: bg, color: 'white', fontWeight: 900, fontSize: size,
-        padding: `${Math.round(size * 0.15)}px ${Math.round(size * 0.42)}px`, borderRadius: 3 }}>
+      <span key={l} style={{
+        background: bg,
+        color: 'white',
+        fontWeight: 900,
+        fontSize: size,
+        padding: `${Math.round(size * 0.15)}px ${Math.round(size * 0.42)}px`,
+        borderRadius: 3,
+      }}>
         {l}
       </span>
     ))}
   </div>
 );
 
-// ── Steps ─────────────────────────────────────────────────────────────
-const STEPS = ['PDF uploaden', 'AI verwerkt', 'Beoordelen', 'Klaar'];
-const PROC = [
-  "PDF's analyseren en pagina's extraheren",
-  'Tekst per pagina extraheren',
-  'Oefeningen herkennen en vraagtypes detecteren',
-  'Interactieve varianten genereren',
-];
-
-// ── Student Preview Modal ─────────────────────────────────────────────
-function StudentPreview({ exercise, onClose }) {
-  // phase: 'easy' → leerling maakt de makkelijke variant
-  //        'hard' → leerling maakt de moeilijke variant
-  //        'done' → beide niveaus afgerond
-  const [phase, setPhase]       = useState('easy');
-  const [answer, setAnswer]     = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
-  const easyVariant = exercise.variants?.[0]; // { level: 'Makkelijker', text: '...' }
-  const hardVariant = exercise.variants?.[1]; // { level: 'Moeilijker',  text: '...' }
-  const hasVariants = !!(easyVariant && hardVariant);
-
-  // Welke vraagstekst tonen we nu?
-  const questionText = hasVariants
-    ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
-    : exercise.original;
-
-  const handleSubmit = () => setSubmitted(true);
-
-  const handleNextLevel = () => {
-    setAnswer('');
-    setSubmitted(false);
-    setPhase('hard');
-  };
-
-  const handleDone = () => setPhase('done');
-
-  // Input-component op basis van vraagtype
-  const renderInput = () => {
-    if (exercise.type === 'Invulvraag') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ fontSize: 13, color: C.textMid }}>Jouw antwoord:</label>
-        <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
-          disabled={submitted} placeholder="Typ hier je antwoord..."
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`, borderRadius: 8,
-            padding: '10px 14px', fontSize: 16, width: 220, color: C.text,
-            background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
-      </div>
-    );
-
-    if (exercise.type === 'Open vraag' || exercise.type === 'Tekenopgave') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ fontSize: 13, color: C.textMid }}>Jouw antwoord:</label>
-        <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
-          placeholder="Schrijf je antwoord hier..." rows={4}
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`, borderRadius: 8,
-            padding: '10px 14px', fontSize: 14, resize: 'none', color: C.text, fontFamily: 'inherit' }} />
-      </div>
-    );
-
-    if (exercise.type === 'Meerkeuze') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {['Antwoord A', 'Antwoord B', 'Antwoord C', 'Antwoord D'].map((opt, i) => (
-          <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
-            style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 8, fontSize: 14,
-              border: `2px solid ${answer === opt ? C.purple : C.border}`,
-              background: answer === opt ? C.purpleLight : C.white, color: C.text,
-              fontWeight: answer === opt ? 600 : 400 }}>
-            {String.fromCharCode(65 + i)}. {opt}
-          </button>
-        ))}
-      </div>
-    );
-
-    if (exercise.type === 'Manipulatieopdracht') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ fontSize: 13, color: C.textMid }}>Jouw antwoord:</label>
-        <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
-          placeholder="Beschrijf wat je hebt gedaan..." rows={3}
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`, borderRadius: 8,
-            padding: '10px 14px', fontSize: 14, resize: 'none', color: C.text, fontFamily: 'inherit' }} />
-      </div>
-    );
-
-    return null;
-  };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}
-      onClick={onClose}>
-      <div style={{ background: C.white, borderRadius: 16, width: 560, maxHeight: '90vh',
-        overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
-        onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
-        <div style={{ background: C.yellow, padding: '13px 20px', borderRadius: '16px 16px 0 0',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <ZwijsenLogo size={12} />
-            <span style={{ fontWeight: 700, fontSize: 12, color: C.text }}>Leerlingweergave</span>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, color: C.text }}>✕</button>
-        </div>
-
-        <div style={{ padding: 24 }}>
-          {/* Topic + pagina badge */}
-          <div style={{ background: C.yellow, display: 'inline-block', padding: '4px 12px',
-            borderRadius: 6, fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 14 }}>
-            Pagina {exercise.page} · {exercise.topic}
-          </div>
-
-          {/* Niveau-indicator (alleen als er varianten zijn) */}
-          {hasVariants && phase !== 'done' && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-              <div style={{
-                background: phase === 'easy' ? C.greenLight : '#f0f0f0',
-                color: phase === 'easy' ? C.green : C.textLight,
-                border: `1.5px solid ${phase === 'easy' ? C.green : '#ddd'}`,
-                borderRadius: 99, padding: '4px 14px', fontSize: 11, fontWeight: 700,
-              }}>① Makkelijker</div>
-              <div style={{
-                background: phase === 'hard' ? C.pinkLight : '#f0f0f0',
-                color: phase === 'hard' ? C.pink : C.textLight,
-                border: `1.5px solid ${phase === 'hard' ? C.pink : '#ddd'}`,
-                borderRadius: 99, padding: '4px 14px', fontSize: 11, fontWeight: 700,
-              }}>② Moeilijker</div>
-            </div>
-          )}
-
-          {/* Klaar-scherm */}
-          {phase === 'done' ? (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: 52, marginBottom: 14 }}>🎉</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: C.green, marginBottom: 8 }}>Super gedaan!</div>
-              <div style={{ fontSize: 14, color: C.textMid, marginBottom: 24 }}>
-                Je hebt beide niveaus afgerond!
-              </div>
-              <button onClick={onClose} style={{ background: C.purple, color: 'white', border: 'none',
-                borderRadius: 8, padding: '12px 32px', fontWeight: 700, fontSize: 14 }}>
-                Sluiten
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Vraagstekst */}
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 20,
-                lineHeight: 1.6, background: C.bg, borderRadius: 10, padding: '14px 16px',
-                border: `1px solid ${C.border}` }}>
-                {questionText}
-              </div>
-
-              {/* Invoerveld op basis van vraagtype */}
-              {renderInput()}
-
-              {/* Antwoord controleren / feedback */}
-              {!submitted ? (
-                <button onClick={handleSubmit} disabled={!answer}
-                  style={{ marginTop: 20, background: C.purple, color: 'white', border: 'none',
-                    borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14,
-                    opacity: answer ? 1 : 0.45, cursor: answer ? 'pointer' : 'not-allowed' }}>
-                  Antwoord controleren →
-                </button>
-              ) : (
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ background: C.greenLight, borderRadius: 10, padding: '12px 16px',
-                    border: `1.5px solid ${C.green}`, marginBottom: 14 }}>
-                    <div style={{ fontWeight: 700, color: C.green, marginBottom: 4 }}>✓ Goed gedaan!</div>
-                    <div style={{ fontSize: 13, color: C.text }}>
-                      {phase === 'easy' && hasVariants
-                        ? 'Klaar voor de moeilijkere versie?'
-                        : 'Je hebt de oefening afgerond.'}
-                    </div>
-                  </div>
-
-                  {phase === 'easy' && hasVariants && (
-                    <button onClick={handleNextLevel}
-                      style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`, color: 'white',
-                        border: 'none', borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
-                      Moeilijkere versie proberen →
-                    </button>
-                  )}
-
-                  {phase === 'hard' && (
-                    <button onClick={handleDone}
-                      style={{ background: C.green, color: 'white', border: 'none',
-                        borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
-                      🎉 Afronden
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main App ──────────────────────────────────────────────────────────
-export default function EduUpcycleApp() {
-  // State
-  const [step, setStep]             = useState(0);
-  const [files, setFiles]           = useState([]);
-  const [uploading, setUploading]   = useState(false);
-  const [procIdx, setProcIdx]       = useState(-1);
-  const [procMsg, setProcMsg]       = useState('');
-  const [exercises, setExercises]   = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [editingType, setEditingType] = useState(false);
-  const [editedType, setEditedType]   = useState('');
-  const [previewEx, setPreviewEx]     = useState(null);
-  const [mode, setMode]               = useState(null); // 'ai' | 'demo'
-  const [pageImages, setPageImages]   = useState({});   // { page: dataUrl }
-  const [error, setError]             = useState(null);
-  const [dragOver, setDragOver]       = useState(false);
-  const [savedLinks, setSavedLinks]   = useState([]);   // [{ id, title }] na Supabase-opslag
-  const [saving, setSaving]           = useState(false);
-  const fileInputRef = useRef(null);
-
-  const selected  = exercises.find(e => e.id === selectedId);
-  const approved  = exercises.filter(e => e.status === 'approved').length;
-  const allDone   = exercises.every(e => e.status !== null) && exercises.length > 0;
-  const tc        = TYPE_COLORS[selected?.type] ?? { bg: C.purpleLight, text: C.purple };
-
-  // ── File handling ───────────────────────────────────────────────────
-  const handleFiles = useCallback((newFiles) => {
-    const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf');
-    if (pdfs.length === 0) {
-      setError('Selecteer alleen PDF-bestanden.');
-      return;
-    }
-    setFiles(prev => [...prev, ...pdfs]);
-    setError(null);
-  }, []);
-
-  const removeFile = (index) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // ── Upload & process ────────────────────────────────────────────────
-  const doProcess = async () => {
-    if (files.length === 0) return;
-    setUploading(true);
-    setStep(1);
-    setError(null);
-
-    try {
-      // Stap 1 & 2: PDF extractie (client-side)
-      setProcIdx(0);
-      setProcMsg(`${files.length} PDF-bestand(en) laden…`);
-
-      let allPages = [];
-      for (let fi = 0; fi < files.length; fi++) {
-        setProcMsg(`Pagina's extraheren: ${files[fi].name}…`);
-        setProcIdx(0);
-        const pages = await extractPdfPages(files[fi]);
-        // Bewaar pagina-afbeeldingen
-        const imgMap = {};
-        pages.forEach(p => { imgMap[`${files[fi].name}-p${p.page}`] = p.imageDataUrl; });
-        setPageImages(prev => ({ ...prev, ...imgMap }));
-
-        allPages.push(...pages.map(p => ({
-          ...p,
-          fileName: files[fi].name,
-          pageKey: `${files[fi].name}-p${p.page}`,
-        })));
-      }
-
-      setProcIdx(1);
-      setProcMsg(`${allPages.length} pagina's geëxtraheerd`);
-      await new Promise(r => setTimeout(r, 400));
-
-      // Stap 3: AI analyse — altijd vision-modus zodat Gemini de pagina echt ziet
-      // CHUNK_SIZE=3: houdt request-grootte klein voor gratis tier
-      const CHUNK_SIZE = 3;
-      const sourcePages = allPages;
-
-      const pageChunks = [];
-      for (let i = 0; i < sourcePages.length; i += CHUNK_SIZE) {
-        pageChunks.push(sourcePages.slice(i, i + CHUNK_SIZE));
-      }
-      if (pageChunks.length === 0) pageChunks.push(allPages.slice(0, CHUNK_SIZE));
-
-      setProcIdx(2);
-      let allExercises = [];
-      let resultMode = 'ai';
-
-            // 5 seconden wachten tussen chunks: gratis tier = max 15 req/min
-      const CHUNK_DELAY_MS = 5000;
-      let rateLimitHits = 0;
-
-      for (let ci = 0; ci < pageChunks.length; ci++) {
-        const chunk = pageChunks[ci];
-        const p1 = chunk[0].page;
-        const p2 = chunk[chunk.length - 1].page;
-
-        if (ci > 0) {
-          setProcMsg(`Even wachten… pagina's ${p1}–${p2} volgt zo`);
-          await new Promise(r => setTimeout(r, CHUNK_DELAY_MS));
-        }
-
-        setProcMsg(`AI analyseert pagina's ${p1}–${p2} (deel ${ci + 1} van ${pageChunks.length})…`);
-
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pages: chunk.map(p => ({
-              page: p.page,
-              text: p.text,
-              fileName: p.fileName,
-              image: p.apiImageDataUrl,
-            })),
-          }),
-        });
-
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          if (err.error === 'NO_API_KEY') {
-            setProcMsg('Geen API key gevonden — demo-modus laden…');
-            await new Promise(r => setTimeout(r, 600));
-            allExercises = DEMO_EXERCISES;
-            resultMode = 'demo';
-            break;
-          } else if (err.error === 'CONTEXT_TOO_LONG') {
-            setProcMsg(`Pagina's ${p1}–${p2} te lang voor AI — overgeslagen`);
-            await new Promise(r => setTimeout(r, 800));
-          } else if (err.error === 'RATE_LIMIT') {
-            // Extra wachttijd en opnieuw proberen
-            setProcMsg(`Rate limit bereikt — 15 seconden wachten…`);
-            await new Promise(r => setTimeout(r, 15000));
-            rateLimitHits++;
-            if (rateLimitHits >= 3) {
-              // Quota op — val terug op demo-modus
-              setProcMsg('Dagelijkse quota bereikt — demo-modus laden…');
-              await new Promise(r => setTimeout(r, 800));
-              allExercises = DEMO_EXERCISES;
-              resultMode = 'demo';
-              break;
-            }
-            setProcMsg(`Rate limit — 20 seconden wachten (${rateLimitHits}/3)…`);
-            await new Promise(r => setTimeout(r, 20000));
-            ci--; // zelfde chunk opnieuw
-          } else {
-            throw new Error(err.message || `API fout bij pagina's ${p1}–${p2}`);
-          }
-        } else {
-          rateLimitHits = 0; // succesvolle aanroep reset de teller
-          const chunkResult = await response.json();
-          allExercises.push(...(chunkResult.exercises || []));
-          resultMode = chunkResult.mode || 'ai';
-        }
-      }
-      setProcIdx(3);
-      setProcMsg(`${allExercises.length} oefeningen gevonden!`);
-      await new Promise(r => setTimeout(r, 600));
-
-      // Klaar → naar review stap
-      setProcIdx(4);
-      setExercises(allExercises.map((ex, i) => ({ ...ex, id: i + 1, status: null })));
-      setMode(resultMode);
-      setSelectedId(1);
-      setStep(2);
-
-    } catch (err) {
-      console.error('Process error:', err);
-      setError(`Fout bij verwerking: ${err.message}`);
-      setStep(0);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // ── Exercise actions ────────────────────────────────────────────────
-  const doStatus = (id, status) => {
-    setExercises(ex => ex.map(e => e.id === id ? { ...e, status } : e));
-    const next = exercises.find(e => e.status === null && e.id !== id);
-    if (next) setSelectedId(next.id);
-  };
-
-  const doSaveType = () => {
-    setExercises(ex => ex.map(e => e.id === selectedId ? { ...e, type: editedType } : e));
-    setEditingType(false);
-  };
-
-  // ── Opslaan naar Supabase ───────────────────────────────────────────
-  const doSave = async () => {
-    const approved = exercises.filter(e => e.status === 'approved');
-    if (approved.length === 0) { setStep(3); return; }
-
-    setSaving(true);
-    try {
-      const res = await fetch('/api/save-exercises', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ exercises: approved }),
-      });
-      const data = await res.json();
-
-      if (data.saved?.length > 0) {
-        // Supabase werkt → sla links op voor de student-pagina
-        setSavedLinks(data.saved.map(ex => ({ id: ex.id, title: ex.title })));
-      } else {
-        // Supabase niet geconfigureerd of fout → alleen JSON export beschikbaar
-        setSavedLinks([]);
-      }
-    } catch (err) {
-      console.warn('Supabase opslaan mislukt:', err.message);
-      setSavedLinks([]);
-    } finally {
-      setSaving(false);
-      setStep(3);
-    }
-  };
-
-  // ── Drop handlers ───────────────────────────────────────────────────
-  const onDrop = useCallback((e) => {
-    e.preventDefault(); setDragOver(false);
-    handleFiles(e.dataTransfer.files);
-  }, [handleFiles]);
-
-  return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.text }}>
-
-      {/* ── Header ── */}
-      <header style={{ background: `linear-gradient(135deg, ${C.purpleDark}, ${C.purple})`,
-        color: 'white', height: 56, padding: '0 28px', display: 'flex', alignItems: 'center', gap: 14,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>
-        <ZwijsenLogo size={15} />
-        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.25)' }} />
-        <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: -0.3 }}>EduUpcycle</span>
-        <span style={{ background: C.pink, fontSize: 9, fontWeight: 800,
-          padding: '2px 7px', borderRadius: 99, letterSpacing: 0.5 }}>AI TOOL</span>
-        {mode && (
-          <span style={{ background: mode === 'ai' ? C.green : C.yellow, fontSize: 9, fontWeight: 800,
-            padding: '2px 7px', borderRadius: 99 }}>
-            {mode === 'ai' ? 'AI MODUS' : 'DEMO MODUS'}
+const Card = ({ href, title, subtitle, description, badge, accent, cta }) => (
+  <Link href={href} style={{ textDecoration: 'none' }}>
+    <article style={{
+      background: 'white',
+      borderRadius: 18,
+      border: `1.5px solid ${C.border}`,
+      padding: 24,
+      minHeight: 280,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      boxShadow: '0 14px 42px rgba(44,19,64,0.08)',
+    }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <span style={{
+            background: accent,
+            color: 'white',
+            borderRadius: 99,
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: 0.6,
+            padding: '4px 10px',
+          }}>
+            {badge}
           </span>
-        )}
-      </header>
+          <span style={{ color: C.textLight, fontSize: 12 }}>{subtitle}</span>
+        </div>
 
-      {/* ── Step bar ── */}
-      <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`,
-        padding: '14px 28px', display: 'flex', alignItems: 'center' }}>
-        {STEPS.map((s, i) => (
-          <div key={s} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 30, height: 30, borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                background: i < step ? C.green : i === step ? C.purple : C.border,
-                color: i <= step ? 'white' : C.textLight, fontWeight: 800, fontSize: 13,
-                boxShadow: i === step ? `0 0 0 3px ${C.purpleLight}` : 'none' }}>
-                {i < step ? '✓' : i + 1}
-              </div>
-              <span style={{ fontSize: 12, fontWeight: i === step ? 700 : 400, whiteSpace: 'nowrap',
-                color: i === step ? C.purple : i < step ? C.green : C.textLight }}>{s}</span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div style={{ flex: 1, height: 2, margin: '0 10px', borderRadius: 2,
-                background: i < step ? C.green : C.border }} />
-            )}
-          </div>
-        ))}
+        <h2 style={{ fontSize: 28, lineHeight: 1.1, marginBottom: 10, color: C.text }}>{title}</h2>
+        <p style={{ color: C.textMid, lineHeight: 1.6, fontSize: 14 }}>{description}</p>
       </div>
 
-      {/* ── Content ── */}
-      <div style={{ padding: '32px 28px', maxWidth: 1280, margin: '0 auto' }}>
-
-        {/* Error banner */}
-        {error && (
-          <div style={{ background: C.redLight, border: `1.5px solid ${C.red}`, borderRadius: 10,
-            padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ color: C.red, fontWeight: 700 }}>⚠</span>
-            <span style={{ color: C.red, fontSize: 13 }}>{error}</span>
-            <button onClick={() => setError(null)} style={{ marginLeft: 'auto', background: 'none',
-              border: 'none', color: C.red, fontWeight: 700, fontSize: 14 }}>✕</button>
-          </div>
-        )}
-
-        {/* ─ Step 0: Upload ─ */}
-        {step === 0 && (
-          <div className="fade" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, marginTop: 24 }}>
-            <div style={{ textAlign: 'center' }}>
-              <h1 style={{ fontSize: 26, fontWeight: 800, color: C.purple, marginBottom: 6 }}>Werkboek-PDFs uploaden</h1>
-              <p style={{ color: C.textMid, fontSize: 14 }}>Sleep één of meerdere PDFs, of klik om te bladeren</p>
-            </div>
-
-            {/* Drop zone */}
-            <div
-              className={dragOver ? 'drop-active' : ''}
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={onDrop}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                width: 540, minHeight: 200, border: `2.5px dashed ${C.purple}`,
-                borderRadius: 18, background: C.white, cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 12, padding: 28,
-                boxShadow: '0 2px 12px rgba(109,32,119,0.08)', transition: 'all 0.2s',
-              }}>
-              <input ref={fileInputRef} type="file" accept=".pdf" multiple
-                style={{ display: 'none' }}
-                onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} />
-              <div style={{ width: 56, height: 56, borderRadius: 14, background: C.purpleLight,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>📄</div>
-              <div style={{ fontWeight: 700, color: C.purple, fontSize: 15 }}>
-                {files.length === 0 ? 'Sleep PDFs hier of klik om te bladeren' : `${files.length} bestand(en) geselecteerd`}
-              </div>
-              <div style={{ fontSize: 12, color: C.textMid }}>Alleen PDF-bestanden · meerdere bestanden tegelijk mogelijk</div>
-            </div>
-
-            {/* File list */}
-            {files.length > 0 && (
-              <div style={{ width: 540, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {files.map((f, i) => (
-                  <div key={i} style={{ background: C.white, border: `1px solid ${C.border}`,
-                    borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 20 }}>📄</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{f.name}</div>
-                      <div style={{ fontSize: 11, color: C.textMid }}>{(f.size / 1024).toFixed(0)} KB</div>
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                      style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 6,
-                        padding: '4px 10px', fontSize: 11, color: C.textMid }}>
-                      ✕ Verwijder
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Start button */}
-            {files.length > 0 && (
-              <button onClick={doProcess} disabled={uploading}
-                style={{ background: `linear-gradient(135deg, ${C.purple}, ${C.purpleDark})`,
-                  color: 'white', border: 'none', borderRadius: 9,
-                  padding: '13px 36px', fontWeight: 700, fontSize: 15,
-                  boxShadow: '0 2px 12px rgba(109,32,119,0.35)' }}>
-                {uploading ? 'Bezig…' : `Analyseer ${files.length} PDF${files.length > 1 ? "'s" : ''} →`}
-              </button>
-            )}
-
-            <div style={{ display: 'flex', gap: 28, opacity: 0.6 }}>
-              {['PDF-extractie', 'AI-analyse', 'Varianten', 'Review-UI'].map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.textMid }}>
-                  <span style={{ color: C.green, fontWeight: 700 }}>✓</span> {f}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ─ Step 1: Processing ─ */}
-        {step === 1 && (
-          <div className="fade" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, marginTop: 32 }}>
-            <div style={{ textAlign: 'center' }}>
-              <h1 style={{ fontSize: 24, fontWeight: 800, color: C.purple, marginBottom: 6 }}>AI analyseert je werkboek…</h1>
-              <p style={{ color: C.textMid, fontSize: 13 }}>{procMsg}</p>
-            </div>
-            <div style={{ width: 560, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {PROC.map((label, i) => {
-                const done = procIdx > i, active = procIdx === i;
-                return (
-                  <div key={i} style={{ background: C.white, borderRadius: 10, padding: '14px 18px',
-                    border: `1.5px solid ${done ? C.green : active ? C.purple : C.border}`,
-                    display: 'flex', alignItems: 'center', gap: 14, transition: 'border-color 0.3s' }}>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: done ? C.green : active ? C.purple : C.border }}>
-                      {done   && <span style={{ color: 'white', fontSize: 14 }}>✓</span>}
-                      {active && <div style={{ width: 14, height: 14, border: '2.5px solid white',
-                        borderTopColor: 'transparent', borderRadius: '50%',
-                        animation: 'spin 0.75s linear infinite' }} />}
-                    </div>
-                    <span style={{ fontSize: 13, color: done || active ? C.text : C.textLight,
-                      fontWeight: active ? 600 : 400 }}>{label}</span>
-                    {done && <span style={{ marginLeft: 'auto', fontSize: 11, color: C.green, fontWeight: 700 }}>Klaar</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ─ Step 2: Review ─ */}
-        {step === 2 && (
-          <div className="fade">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 }}>
-              <div>
-                <h1 style={{ fontSize: 22, fontWeight: 800, color: C.purple, marginBottom: 4 }}>Beoordelen & valideren</h1>
-                <p style={{ color: C.textMid, fontSize: 13 }}>
-                  {approved} van {exercises.length} oefeningen goedgekeurd
-                  {allDone && <span style={{ color: C.green, fontWeight: 700, marginLeft: 8 }}>· Alles beoordeeld!</span>}
-                </p>
-              </div>
-              {allDone && (
-                <button onClick={doSave} disabled={saving} style={{
-                  background: `linear-gradient(135deg, ${C.pink}, #A0004A)`,
-                  color: 'white', border: 'none', borderRadius: 9,
-                  padding: '11px 26px', fontWeight: 700, fontSize: 14,
-                  opacity: saving ? 0.7 : 1,
-                  boxShadow: '0 2px 10px rgba(200,0,92,0.35)' }}>
-                  {saving ? 'Opslaan…' : 'Opslaan & afronden →'}
-                </button>
-              )}
-            </div>
-
-            {/* Progress bar */}
-            <div style={{ height: 6, background: C.border, borderRadius: 3, marginBottom: 20, overflow: 'hidden' }}>
-              <div style={{ width: `${exercises.length ? (approved / exercises.length) * 100 : 0}%`,
-                height: '100%', background: C.green, borderRadius: 3, transition: 'width 0.4s' }} />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20 }}>
-
-              {/* Exercise list */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
-                {exercises.map(ex => {
-                  const etc = TYPE_COLORS[ex.type] ?? { bg: C.purpleLight, text: C.purple };
-                  return (
-                    <div key={ex.id} onClick={() => { setSelectedId(ex.id); setEditingType(false); }}
-                      style={{ background: ex.id === selectedId ? C.purpleLight : C.white,
-                        border: `1.5px solid ${ex.id === selectedId ? C.purple : C.border}`,
-                        borderRadius: 10, padding: '11px 13px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: C.text, lineHeight: 1.35 }}>{ex.title}</span>
-                        {ex.status === 'approved' && <Badge label="✓ OK"   bg={C.greenLight}  color={C.green} small />}
-                        {ex.status === 'rejected' && <Badge label="✗ Afg." bg={C.redLight}    color={C.red}   small />}
-                        {ex.status === null       && <Badge label="Open"   bg="#FFF8DC"        color="#7A5500" small />}
-                      </div>
-                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                        <Badge label={ex.type}              bg={etc.bg}  color={etc.text}              small />
-                        <Badge label={`${ex.confidence}%`}  bg={C.bg}    color={confColor(ex.confidence)} small />
-                        <Badge label={`p.${ex.page}`}       bg={C.bg}    color={C.textMid}              small />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Detail panel */}
-              {selected && (
-                <div style={{ background: C.white, borderRadius: 12, border: `1.5px solid ${C.border}`,
-                  overflow: 'hidden', boxShadow: '0 2px 16px rgba(109,32,119,0.07)' }}>
-
-                  {/* Panel header */}
-                  <div style={{ background: `linear-gradient(135deg, ${C.purpleDark}, ${C.purple})`,
-                    padding: '13px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>{selected.title}</span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => setPreviewEx(selected)} style={{
-                        background: 'rgba(255,255,255,0.18)', color: 'white',
-                        border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6,
-                        padding: '5px 12px', fontSize: 11, fontWeight: 600 }}>
-                        👁 Leerlingweergave
-                      </button>
-                      <span style={{ background: 'rgba(255,255,255,0.15)', color: 'white',
-                        fontSize: 11, padding: '4px 10px', borderRadius: 99 }}>
-                        Pagina {selected.page}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                    {/* Left: original + image */}
-                    <div>
-                      {/* Pagina-afbeelding als die beschikbaar is */}
-                      {Object.keys(pageImages).length > 0 && (
-                        <>
-                          <SL>Paginaweergave (PDF)</SL>
-                          <div style={{ marginBottom: 14, borderRadius: 8, overflow: 'hidden',
-                            border: `1px solid ${C.border}`, maxHeight: 200 }}>
-                            <img
-                              src={pageImages[Object.keys(pageImages).find(k => k.includes(`p${selected.page}`))] || Object.values(pageImages)[0]}
-                              alt={`Pagina ${selected.page}`}
-                              style={{ width: '100%', display: 'block', objectFit: 'cover', objectPosition: 'top' }}
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      <SL>Originele tekst (PDF)</SL>
-                      <div style={{ background: '#FFFBF0', border: '1px solid #E5D8A0',
-                        borderRadius: 8, padding: 14, marginBottom: 14 }}>
-                        <div style={{ fontFamily: 'monospace', fontSize: 12.5, color: C.text,
-                          lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{selected.original}</div>
-                      </div>
-                      <SL>AI-notitie</SL>
-                      <div style={{ background: C.blueLight, border: '1px solid #B8D0F5',
-                        borderRadius: 8, padding: 12, fontSize: 12, color: C.blue, lineHeight: 1.55 }}>
-                        💡 {selected.note}
-                      </div>
-
-                      <SL>Illustratie</SL>
-                      <div style={{ marginBottom: 14 }}>
-                        <ExerciseIllustration type={selected.type} />
-                      </div>
-                    </div>
-
-                    {/* Right: AI output */}
-                    <div>
-                      <SL>AI-detectie</SL>
-
-                      <IB>
-                        <div style={{ fontSize: 10, color: C.textLight, marginBottom: 5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7 }}>Vraagtype</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {editingType && selected.status === null ? (
-                            <>
-                              <select value={editedType} onChange={e => setEditedType(e.target.value)}
-                                style={{ border: `1.5px solid ${C.purple}`, borderRadius: 6,
-                                  padding: '5px 8px', fontSize: 13, color: C.text, background: 'white' }}>
-                                {Object.keys(TYPE_COLORS).map(t => <option key={t}>{t}</option>)}
-                              </select>
-                              <button onClick={doSaveType} style={{ background: C.green, color: 'white',
-                                border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 600 }}>Opslaan</button>
-                              <button onClick={() => setEditingType(false)} style={{ background: C.border, color: C.textMid,
-                                border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12 }}>✕</button>
-                            </>
-                          ) : (
-                            <>
-                              <Badge label={selected.type} bg={tc.bg} color={tc.text} />
-                              {selected.status === null && (
-                                <button onClick={() => { setEditingType(true); setEditedType(selected.type); }}
-                                  style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textMid,
-                                    borderRadius: 6, padding: '3px 9px', fontSize: 11 }}>
-                                  ✎ Aanpassen
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </IB>
-
-                      <IB>
-                        <div style={{ fontSize: 10, color: C.textLight, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7 }}>AI-vertrouwen</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ flex: 1, height: 8, background: C.border, borderRadius: 4, overflow: 'hidden' }}>
-                            <div style={{ width: `${selected.confidence}%`, height: '100%',
-                              background: confColor(selected.confidence), borderRadius: 4, transition: 'width 0.4s' }} />
-                          </div>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: confColor(selected.confidence), minWidth: 36 }}>
-                            {selected.confidence}%
-                          </span>
-                        </div>
-                        {selected.confidence < 78 && (
-                          <div style={{ fontSize: 11, color: C.orange, marginTop: 5 }}>
-                            ⚠ Lage zekerheid — controleer dit vraagtype handmatig
-                          </div>
-                        )}
-                      </IB>
-
-                      <IB>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                          <div>
-                            <div style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Onderwerp</div>
-                            <div style={{ fontSize: 12, fontWeight: 600 }}>{selected.topic}</div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Moeilijkheid</div>
-                            <div style={{ fontSize: 12, fontWeight: 600 }}>{selected.difficulty}</div>
-                          </div>
-                          <div style={{ gridColumn: '1/-1' }}>
-                            <div style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Interactief formaat</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>{selected.format}</div>
-                          </div>
-                        </div>
-                      </IB>
-
-                      <SL>Gegenereerde varianten</SL>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {selected.variants?.map(v => (
-                          <div key={v.level} style={{ background: C.bg, borderRadius: 8,
-                            padding: '10px 12px', border: `1px solid ${C.border}` }}>
-                            <Badge label={v.level}
-                              bg={v.level === 'Makkelijker' ? C.greenLight : C.pinkLight}
-                              color={v.level === 'Makkelijker' ? C.green : C.pink} small />
-                            <div style={{ fontSize: 12, color: C.text, marginTop: 7, lineHeight: 1.55 }}>{v.text}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action bar */}
-                  {selected.status === null ? (
-                    <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 20px',
-                      display: 'flex', gap: 10, justifyContent: 'flex-end', background: '#FAFAFA' }}>
-                      <button onClick={() => doStatus(selected.id, 'rejected')} style={{
-                        background: 'white', color: C.red, border: `1.5px solid ${C.red}`,
-                        borderRadius: 8, padding: '9px 20px', fontWeight: 600, fontSize: 13 }}>
-                        ✗ Afwijzen
-                      </button>
-                      <button onClick={() => doStatus(selected.id, 'approved')} style={{
-                        background: `linear-gradient(135deg, ${C.green}, #1E8039)`,
-                        color: 'white', border: 'none', borderRadius: 8, padding: '9px 26px',
-                        fontWeight: 700, fontSize: 13, boxShadow: '0 2px 8px rgba(45,170,79,0.3)' }}>
-                        ✓ Goedkeuren
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 20px',
-                      display: 'flex', alignItems: 'center', gap: 10, background: '#FAFAFA' }}>
-                      {selected.status === 'approved'
-                        ? <span style={{ color: C.green, fontWeight: 700 }}>✓ Goedgekeurd</span>
-                        : <span style={{ color: C.red,   fontWeight: 700 }}>✗ Afgewezen</span>}
-                      <button onClick={() => setExercises(ex => ex.map(e => e.id === selected.id ? { ...e, status: null } : e))}
-                        style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${C.border}`,
-                          color: C.textMid, borderRadius: 6, padding: '6px 14px', fontSize: 12 }}>
-                        Ongedaan maken
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ─ Step 3: Done ─ */}
-        {step === 3 && (
-          <div className="fade" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, marginTop: 40 }}>
-            <div style={{ width: 88, height: 88, borderRadius: '50%', background: C.greenLight,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40,
-              boxShadow: `0 0 0 8px ${C.greenLight}` }}>✓</div>
-            <div style={{ textAlign: 'center' }}>
-              <h1 style={{ fontSize: 26, fontWeight: 800, color: C.purple, marginBottom: 6 }}>Oefeningen opgeslagen!</h1>
-              <p style={{ color: C.textMid }}>
-                {approved} van {exercises.length} oefeningen zijn goedgekeurd en klaarstaan als interactieve content.
-              </p>
-            </div>
-
-            {/* Supabase student-links (alleen als opslaan gelukt is) */}
-            {savedLinks.length > 0 && (
-              <div style={{ width: 560, background: C.greenLight, borderRadius: 12,
-                padding: '16px 20px', border: `1.5px solid ${C.green}` }}>
-                <div style={{ fontWeight: 700, color: C.green, marginBottom: 12, fontSize: 14 }}>
-                  ✓ Opgeslagen in database · Deel deze links met leerlingen:
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {savedLinks.map(link => (
-                    <div key={link.id} style={{ background: C.white, borderRadius: 8,
-                      padding: '10px 14px', display: 'flex', justifyContent: 'space-between',
-                      alignItems: 'center', border: `1px solid ${C.border}` }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{link.title}</span>
-                      <a href={`/student/${link.id}`} target="_blank" rel="noreferrer"
-                        style={{ fontSize: 12, color: C.teal, fontWeight: 700, textDecoration: 'none' }}>
-                        /student/{link.id.slice(0, 8)}… →
-                      </a>
-                    </div>
-                  ))}
-                </div>
-                <a href="/student" target="_blank" rel="noreferrer"
-                  style={{ display: 'block', marginTop: 10, fontSize: 12, color: C.textMid, textDecoration: 'none' }}>
-                  Of deel de overzichtspagina: /student
-                </a>
-              </div>
-            )}
-
-            {/* Geen Supabase → toon info */}
-            {savedLinks.length === 0 && (
-              <div style={{ width: 560, background: C.blueLight, borderRadius: 12,
-                padding: '14px 18px', border: `1px solid #B8D0F5`, fontSize: 13, color: C.blue }}>
-                💡 Voeg <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> toe aan je
-                environment variables om oefeningen op te slaan en student-links te genereren.
-              </div>
-            )}
-
-            {/* Export als JSON */}
-            <button onClick={() => {
-              const data = exercises.filter(e => e.status === 'approved');
-              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url; a.download = 'eduurcycle-oefeningen.json'; a.click();
-              URL.revokeObjectURL(url);
-            }} style={{ background: C.teal, color: 'white', border: 'none', borderRadius: 8,
-              padding: '10px 24px', fontWeight: 700, fontSize: 13 }}>
-              📥 Exporteer als JSON
-            </button>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, width: 540 }}>
-              {exercises.filter(e => e.status === 'approved').map(ex => {
-                const etc = TYPE_COLORS[ex.type] ?? { bg: C.purpleLight, text: C.purple };
-                return (
-                  <div key={ex.id} style={{ background: C.white, borderRadius: 10, padding: 14, border: `1px solid ${C.border}` }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8 }}>{ex.title}</div>
-                    <Badge label={ex.type} bg={etc.bg} color={etc.text} small />
-                  </div>
-                );
-              })}
-            </div>
-
-            <button onClick={() => {
-              setStep(0); setExercises([]); setSelectedId(null);
-              setFiles([]); setPageImages({}); setMode(null); setProcIdx(-1);
-              setSavedLinks([]);
-            }} style={{ background: `linear-gradient(135deg, ${C.purpleDark}, ${C.purple})`,
-              color: 'white', border: 'none', borderRadius: 9, padding: '13px 32px',
-              fontWeight: 700, fontSize: 14, marginTop: 8,
-              boxShadow: '0 2px 12px rgba(109,32,119,0.35)' }}>
-              Nieuwe PDF uploaden
-            </button>
-          </div>
-        )}
+      <div style={{
+        marginTop: 20,
+        fontWeight: 800,
+        fontSize: 14,
+        color: accent,
+      }}>
+        {cta} →
       </div>
+    </article>
+  </Link>
+);
 
-      {/* Student preview modal */}
-      {previewEx && <StudentPreview exercise={previewEx} onClose={() => setPreviewEx(null)} />}
-    </div>
+export default function HomePortalPage() {
+  return (
+    <main style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(165deg, #F7F2FB 0%, #F0FAF6 45%, #FDF7EC 100%)',
+      color: C.text,
+      padding: '40px 20px 56px',
+    }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+        <header style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 16,
+          marginBottom: 36,
+          flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <ZwijsenLogo size={13} />
+            <div style={{ width: 1, height: 22, background: '#D7C8E2' }} />
+            <span style={{ fontWeight: 800, letterSpacing: -0.2 }}>EduUpcycle</span>
+          </div>
+          <span style={{
+            background: C.purple,
+            color: 'white',
+            borderRadius: 99,
+            fontSize: 11,
+            fontWeight: 800,
+            padding: '4px 11px',
+          }}>
+            GEEN LOGIN NODIG
+          </span>
+        </header>
+
+        <section style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: 40, lineHeight: 1.03, color: C.purpleDark, marginBottom: 12 }}>
+            Kies je werkruimte
+          </h1>
+          <p style={{ maxWidth: 760, fontSize: 16, lineHeight: 1.6, color: C.textMid }}>
+            De flow is nu duidelijk gescheiden: docenten genereren en beoordelen oefeningen in een portal,
+            leerlingen werken zelfstandig in hun eigen oefenomgeving.
+          </p>
+        </section>
+
+        <section style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: 18,
+        }}>
+          <Card
+            href="/teacher"
+            title="Docent Portal"
+            subtitle="PDF → AI → Goedkeuren"
+            description="Upload werkboek-PDF's, laat AI oefeningen maken, beoordeel kwaliteit en publiceer naar de leerlingomgeving."
+            badge="DOCENT"
+            accent={C.purple}
+            cta="Naar docentomgeving"
+          />
+
+          <Card
+            href="/student"
+            title="Leerling Portal"
+            subtitle="Maken op eigen tempo"
+            description="Bekijk beschikbare oefeningen, open een opdracht en maak de makkelijke en moeilijkere versie zonder afleiding."
+            badge="LEERLING"
+            accent={C.teal}
+            cta="Naar leerlingomgeving"
+          />
+        </section>
+      </div>
+    </main>
   );
 }

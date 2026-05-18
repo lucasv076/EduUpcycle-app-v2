@@ -36,6 +36,8 @@ export default async function StudentListPage() {
         <span style={{ fontWeight: 800, fontSize: 16 }}>Oefeningen</span>
         <span style={{ background: C.yellow, color: C.text, fontSize: 9, fontWeight: 800,
           padding: '2px 7px', borderRadius: 99 }}>LEERLING</span>
+        <Link href="/" style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)',
+          fontSize: 12, textDecoration: 'none' }}>Portalen</Link>
       </header>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '36px 24px' }}>

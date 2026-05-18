@@ -1,8 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
+import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
+import SubmissionHistory from '@/components/SubmissionHistory';
+
+// Generate or retrieve a stable session ID
+function getSessionId() {
+  if (typeof window === 'undefined') return null;
+  let sessionId = localStorage.getItem('eduupcycle_session_id');
+  if (!sessionId) {
+    sessionId = 'student_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem('eduupcycle_session_id', sessionId);
+  }
+  return sessionId;
+}
+
+const VAARDIGHEID_MAP = {
+  // Standaard types
+  'Open vraag':           'Je schrijft een antwoord in je eigen woorden.',
+  'Invulvraag':           'Je vult het juiste woord of getal in.',
+  'Meerkeuze':            'Je kiest het goede antwoord uit de opties.',
+  'Tekenopgave':          'Je maakt een tekening of schets.',
+  'Manipulatieopdracht':  'Je ordent, sorteert of verplaatst elementen.',
+  // Blokkenbouwsel per interactietype
+  'blokken_meerkeuze':    'Je herkent welk 3D-bouwsel bij de plattegrond hoort.',
+  'blokken_tellen':       'Je telt hoeveel blokjes er in het bouwsel zitten.',
+  'blokken_goedFout':     'Je controleert of het bouwsel klopt met de plattegrond.',
+  'blokken_bouwen':       'Je vult zelf de plattegrond in bij een 3D-bouwsel.',
+};
+
+function buildLeerdoel(topic, type, blockInteractionType) {
+  const parts = topic ? topic.split(/\s*[–—-]\s*/) : [];
+  const vak  = parts.length >= 2 ? parts[0].trim() : null;
+  const doel = parts.length >= 2 ? parts.slice(1).join(' – ').trim() : (topic || '');
+
+  const key = type === 'Blokkenbouwsel' && blockInteractionType
+    ? `blokken_${blockInteractionType}`
+    : type;
+  const vaardigheid = VAARDIGHEID_MAP[key] || null;
+
+  return { vak, doel, vaardigheid };
+}
 
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -20,14 +60,84 @@ export default function ExercisePage({ exercise }) {
   const [phase, setPhase]         = useState('easy');
   const [answer, setAnswer]       = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+
+  // Initialize session ID on mount
+  useEffect(() => {
+    setSessionId(getSessionId());
+  }, []);
 
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
+  const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
+  const VALID_BLOCK_TYPES = ['tellen', 'goedFout', 'bouwen', 'meerkeuze'];
+  const blockInteractionType = isBlockQuestion
+    ? (VALID_BLOCK_TYPES.includes(exercise.block_interaction_type)
+        ? exercise.block_interaction_type
+        : (exercise.block_option_a_grid?.length && exercise.block_option_b_grid?.length
+            ? 'meerkeuze'
+            : 'goedFout'))
+    : null;
+  const isHardVariant = phase === 'hard';
+  const activeBlockInteractionType = isBlockQuestion && isHardVariant
+    ? 'bouwen'
+    : blockInteractionType;
+  const isBuildMode = activeBlockInteractionType === 'bouwen';
+  const isTellenMode = activeBlockInteractionType === 'tellen';
+  const isGoedFoutMode = activeBlockInteractionType === 'goedFout';
+  const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
+  const maxH = exercise.block_max_height || 5;
 
-  const questionText = hasVariants
+  const rawQuestionText = hasVariants
     ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
     : exercise.original;
+  const questionText = isBlockQuestion
+    ? rawQuestionText.replace(/\b[Aa]\s*,\s*[Bb]\s*,?\s*(?:of|en)\s+[Cc]\b/g, 'A of B')
+    : rawQuestionText;
+
+  // For block exercises, track whether the answer is actually correct
+  const blockTotalCount = isTellenMode && exercise.block_plan_grid
+    ? exercise.block_plan_grid.flat().reduce((s, v) => s + v, 0)
+    : null;
+
+  const goedFoutCorrectAnswer = isGoedFoutMode
+    ? (exercise.block_correct_option === 'A' ? 'Goed' : 'Fout')
+    : null;
+
+  const isAnswerCorrect = submitted
+    ? isBuildMode
+      ? gridsEqual(answer, exercise.block_plan_grid)
+      : isTellenMode
+        ? Number(answer) === blockTotalCount
+        : isGoedFoutMode
+          ? answer === goedFoutCorrectAnswer
+          : isBlockQuestion
+            ? answer === exercise.block_correct_option
+            : true
+    : null;
+
+  // Save submission when answer is submitted
+  useEffect(() => {
+    if (submitted && sessionId && answer) {
+      const submittedGrid = isBlockQuestion ? answer : null;
+
+      fetch('/api/save-submission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exerciseId: exercise.id,
+          sessionId,
+          difficultyLevel: phase,
+          answer: (isBlockQuestion && !isTellenMode && !isGoedFoutMode) ? null : answer,
+          isCorrect: isAnswerCorrect,
+          submittedGrid,
+        }),
+      }).catch(err => {
+        console.error('Failed to save submission:', err);
+      });
+    }
+  }, [submitted, sessionId, answer, exercise.id, isBlockQuestion, isAnswerCorrect, phase]);
 
   const handleSubmit = () => setSubmitted(true);
 
@@ -41,33 +151,211 @@ export default function ExercisePage({ exercise }) {
 
   // ── Input op basis van vraagtype ────────────────────────────────────
   const renderInput = () => {
-    if (exercise.type === 'Invulvraag') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
-        <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
-          disabled={submitted} placeholder="Typ hier je antwoord..."
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`,
-            borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
-            color: C.text, background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
-      </div>
+    if (isBlockQuestion && isTellenMode) {
+      const displayGrid = clampGrid(
+        exercise.block_goal_grid || exercise.block_plan_grid || exercise.block_option_a_grid,
+        maxH
+      );
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {displayGrid.length > 0 ? (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Bouwsel — tel alle blokjes
+              </div>
+              <CubePreview grid={displayGrid} />
+            </div>
+          ) : (
+            <div style={{ background: C.redLight, color: C.red, borderRadius: 10, padding: 12, fontSize: 13 }}>
+              Geen bouwsel-data beschikbaar voor deze oefening.
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>
+              Aantal blokken:
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              disabled={submitted}
+              placeholder="Voer het aantal in..."
+              style={{
+                border: `2px solid ${submitted ? C.green : C.border}`,
+                borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 160,
+                color: C.text, background: submitted ? C.greenLight : C.white,
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (isBlockQuestion && isGoedFoutMode) {
+      const shownGrid = clampGrid(exercise.block_option_a_grid || exercise.block_goal_grid, maxH);
+      const planGrid = clampGrid(exercise.block_plan_grid || exercise.block_goal_grid, maxH);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {shownGrid.length > 0 ? (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Dit bouwsel
+              </div>
+              <CubePreview grid={shownGrid} />
+            </div>
+          ) : null}
+          {planGrid.length > 0 ? (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Plattegrond (bovenaanzicht)
+              </div>
+              <PlanGridDisplay grid={planGrid} />
+            </div>
+          ) : null}
+          <div style={{ display: 'flex', gap: 12 }}>
+            {['Goed', 'Fout'].map(opt => (
+              <button
+                key={opt}
+                type="button"
+                disabled={submitted}
+                onClick={() => !submitted && setAnswer(opt)}
+                style={{
+                  flex: 1, padding: '14px 0', borderRadius: 10, fontSize: 16, fontWeight: 700,
+                  border: `2px solid ${answer === opt ? (opt === 'Goed' ? C.green : C.red) : C.border}`,
+                  background: answer === opt ? (opt === 'Goed' ? C.greenLight : C.redLight) : C.white,
+                  color: answer === opt ? (opt === 'Goed' ? C.green : C.red) : C.text,
+                  cursor: submitted ? 'default' : 'pointer',
+                }}
+              >
+                {opt === 'Goed' ? '✓ Goed' : '✗ Fout'}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (isBlockQuestion && isBuildMode) {
+      const targetGrid = clampGrid(exercise.block_goal_grid || exercise.block_plan_grid, maxH);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {targetGrid.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Dit bouwsel moet je nabouwen — vul hieronder de plattegrond in
+              </div>
+              <CubePreview grid={targetGrid} />
+            </div>
+          )}
+          <BlokkenBouwselInteractive
+            goalGrid={exercise.block_goal_grid}
+            planGrid={exercise.block_plan_grid}
+            optionAGrid={exercise.block_option_a_grid}
+            optionBGrid={exercise.block_option_b_grid}
+            correctOption={exercise.block_correct_option}
+            maxHeight={maxH}
+            onAnswered={(val) => setAnswer(val)}
+            disabled={submitted}
+            buildMode
+            showPlanHint={false}
+            showFeedback={submitted}
+          />
+        </div>
+      );
+    }
+
+    if (isBlockQuestion && isMeerkeuzMode) return (
+      <BlokkenBouwselInteractive
+        goalGrid={exercise.block_goal_grid}
+        planGrid={exercise.block_plan_grid}
+        optionAGrid={exercise.block_option_a_grid}
+        optionBGrid={exercise.block_option_b_grid}
+        correctOption={exercise.block_correct_option}
+        maxHeight={maxH}
+        onAnswered={(val) => setAnswer(val)}
+        disabled={submitted}
+        buildMode={false}
+        showFeedback={submitted}
+      />
     );
 
+    if (exercise.type === 'Invulvraag') {
+      const blockGrid = exercise.block_goal_grid?.length > 0
+        ? clampGrid(exercise.block_goal_grid, maxH)
+        : exercise.block_plan_grid?.length > 0
+          ? clampGrid(exercise.block_plan_grid, maxH)
+          : null;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {blockGrid?.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Bouwsel — bekijk goed
+              </div>
+              <CubePreview grid={blockGrid} />
+            </div>
+          )}
+          {exercise.source_page_image_data_url && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
+                Opdracht uit werkboek
+              </div>
+              <img src={exercise.source_page_image_data_url} alt="Opdracht"
+                style={{ width: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 6 }} />
+            </div>
+          )}
+          <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
+          <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
+            disabled={submitted} placeholder="Typ hier je antwoord..."
+            style={{ border: `2px solid ${submitted ? C.green : C.border}`,
+              borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
+              color: C.text, background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
+        </div>
+      );
+    }
+
     if (exercise.type === 'Open vraag' || exercise.type === 'Tekenopgave'
-      || exercise.type === 'Manipulatieopdracht') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
-        <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
-          placeholder="Schrijf je antwoord hier..." rows={5}
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`,
-            borderRadius: 10, padding: '12px 16px', fontSize: 15, resize: 'none',
-            color: C.text, fontFamily: 'inherit', maxWidth: 500 }} />
-      </div>
-    );
+      || exercise.type === 'Manipulatieopdracht') {
+      const blockGrid = exercise.block_goal_grid?.length > 0
+        ? clampGrid(exercise.block_goal_grid, maxH)
+        : exercise.block_plan_grid?.length > 0
+          ? clampGrid(exercise.block_plan_grid, maxH)
+          : null;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {blockGrid?.length > 0 && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 8 }}>
+                Bouwsel — bekijk goed
+              </div>
+              <CubePreview grid={blockGrid} />
+            </div>
+          )}
+          {exercise.source_page_image_data_url && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 6 }}>
+                Opdracht uit werkboek
+              </div>
+              <img src={exercise.source_page_image_data_url} alt="Opdracht"
+                style={{ width: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 6 }} />
+            </div>
+          )}
+          <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
+          <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={submitted}
+            placeholder="Schrijf je antwoord hier..." rows={5}
+            style={{ border: `2px solid ${submitted ? C.green : C.border}`,
+              borderRadius: 10, padding: '12px 16px', fontSize: 15, resize: 'none',
+              color: C.text, fontFamily: 'inherit', maxWidth: 500 }} />
+        </div>
+      );
+    }
 
     if (exercise.type === 'Meerkeuze') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
         {['Antwoord A', 'Antwoord B', 'Antwoord C', 'Antwoord D'].map((opt, i) => (
-          <button key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
+          <button type="button" key={i} onClick={() => !submitted && setAnswer(opt)} disabled={submitted}
             style={{ textAlign: 'left', padding: '13px 18px', borderRadius: 10, fontSize: 15,
               border: `2px solid ${answer === opt ? C.purple : C.border}`,
               background: answer === opt ? C.purpleLight : C.white, color: C.text,
@@ -91,7 +379,9 @@ export default function ExercisePage({ exercise }) {
         <ZwijsenLogo />
         <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.25)' }} />
         <span style={{ fontWeight: 800, fontSize: 16 }}>Oefeningen</span>
-        <Link href="/student" style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)',
+        <Link href="/" style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)',
+          fontSize: 12, textDecoration: 'none' }}>Portalen</Link>
+        <Link href="/student" style={{ marginLeft: 14, color: 'rgba(255,255,255,0.75)',
           fontSize: 12, textDecoration: 'none' }}>← Terug naar overzicht</Link>
       </header>
 
@@ -104,9 +394,45 @@ export default function ExercisePage({ exercise }) {
         </div>
 
         {/* Titel */}
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 20, lineHeight: 1.3 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 16, lineHeight: 1.3 }}>
           {exercise.title}
         </h1>
+
+        {/* Leerdoel-balk */}
+        {(() => {
+          const ld = buildLeerdoel(exercise.topic, exercise.type, blockInteractionType);
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12,
+              background: '#F0E8FB',
+              borderLeft: `5px solid ${C.purple}`,
+              borderRadius: 12,
+              border: `1.5px solid ${C.purple}`,
+              padding: '14px 18px',
+              marginBottom: 20,
+            }}>
+              <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>🎯</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Leerdoel
+                </div>
+                {ld.doel && (
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text, lineHeight: 1.4 }}>
+                    {ld.vak && (
+                      <span style={{ color: C.textMid, fontWeight: 600 }}>{ld.vak} &rsaquo; </span>
+                    )}
+                    {ld.doel}
+                  </div>
+                )}
+                {ld.vaardigheid && (
+                  <div style={{ fontSize: 13, color: C.textMid, fontWeight: 500, lineHeight: 1.4 }}>
+                    {ld.vaardigheid}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Niveau-indicator */}
         {hasVariants && phase !== 'done' && (
@@ -139,7 +465,7 @@ export default function ExercisePage({ exercise }) {
               Je hebt beide niveaus afgerond!
             </div>
             <Link href="/student">
-              <button style={{ background: C.purple, color: 'white', border: 'none',
+              <button type="button" style={{ background: C.purple, color: 'white', border: 'none',
                 borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
                 cursor: 'pointer' }}>
                 Nog een oefening →
@@ -162,7 +488,7 @@ export default function ExercisePage({ exercise }) {
 
             {/* Submit / feedback */}
             {!submitted ? (
-              <button onClick={handleSubmit} disabled={!answer}
+              <button type="button" onClick={handleSubmit} disabled={!answer}
                 style={{ marginTop: 24, background: C.purple, color: 'white', border: 'none',
                   borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
                   opacity: answer ? 1 : 0.4, cursor: answer ? 'pointer' : 'not-allowed' }}>
@@ -170,20 +496,34 @@ export default function ExercisePage({ exercise }) {
               </button>
             ) : (
               <div style={{ marginTop: 24 }}>
-                <div style={{ background: C.greenLight, borderRadius: 12, padding: '14px 18px',
-                  border: `1.5px solid ${C.green}`, marginBottom: 16 }}>
-                  <div style={{ fontWeight: 800, color: C.green, fontSize: 15, marginBottom: 4 }}>
-                    ✓ Goed gedaan!
+                {/* Build mode shows its own feedback inside BlokkenBouwselInteractive */}
+                {!isBuildMode && (
+                  <div style={{
+                    background: isAnswerCorrect === false ? C.redLight : C.greenLight,
+                    borderRadius: 12, padding: '14px 18px',
+                    border: `1.5px solid ${isAnswerCorrect === false ? C.red : C.green}`,
+                    marginBottom: 16,
+                  }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4,
+                      color: isAnswerCorrect === false ? C.red : C.green }}>
+                      {isAnswerCorrect === false ? '✗ Niet helemaal goed…' : '✓ Goed gedaan!'}
+                    </div>
+                    <div style={{ fontSize: 13, color: C.text }}>
+                      {isAnswerCorrect === false
+                        ? isTellenMode
+                          ? `Tel nog eens! Het goede antwoord is ${blockTotalCount}.`
+                          : isGoedFoutMode
+                            ? `Niet goed. Het antwoord is: ${goedFoutCorrectAnswer}.`
+                            : 'Kijk nog eens goed naar de plattegrond.'
+                        : phase === 'easy' && hasVariants
+                          ? 'Klaar voor de moeilijkere versie?'
+                          : 'Je hebt de oefening afgerond!'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 13, color: C.text }}>
-                    {phase === 'easy' && hasVariants
-                      ? 'Klaar voor de moeilijkere versie?'
-                      : 'Je hebt de oefening afgerond!'}
-                  </div>
-                </div>
+                )}
 
                 {phase === 'easy' && hasVariants && (
-                  <button onClick={handleNextLevel}
+                  <button type="button" onClick={handleNextLevel}
                     style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`,
                       color: 'white', border: 'none', borderRadius: 10,
                       padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
@@ -192,10 +532,10 @@ export default function ExercisePage({ exercise }) {
                 )}
 
                 {phase === 'hard' && (
-                  <button onClick={handleDone}
+                  <button type="button" onClick={handleDone}
                     style={{ background: C.green, color: 'white', border: 'none',
                       borderRadius: 10, padding: '13px 32px', fontWeight: 700,
-                      fontSize: 15, cursor: 'pointer' }}>
+                      fontSize: 15, cursor: 'pointer', marginTop: isBuildMode ? 12 : 0 }}>
                     🎉 Afronden
                   </button>
                 )}
@@ -203,6 +543,8 @@ export default function ExercisePage({ exercise }) {
             )}
           </div>
         )}
+
+        <SubmissionHistory exerciseId={exercise.id} />
       </div>
     </div>
   );
