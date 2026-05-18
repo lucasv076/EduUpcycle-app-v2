@@ -6,6 +6,7 @@ import { DEMO_EXERCISES } from '@/lib/demo-data';
 import { extractPdfPages } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
 import { checkAnswer } from '@/lib/answer-validation';
+import { getProgress, recordAttempt } from '@/lib/progress';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
 const Badge = ({ label, bg, color, small }) => (
@@ -50,10 +51,22 @@ function StudentPreview({ exercise, onClose }) {
   const [answer, setAnswer]     = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [streak, setStreak]     = useState({ correctStreak: 0, incorrectStreak: 0, level: 'easy' });
+  const [levelMsg, setLevelMsg] = useState(null);
+  const recorded = useRef(false);
 
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
+
+  // Bij openen: haal opgeslagen studentniveau op
+  useEffect(() => {
+    const p = getProgress('student');
+    setStreak(p);
+    if (p.level === 'hard' && hasVariants) {
+      setPhase('hard');
+    }
+  }, [hasVariants]);
 
   const currentVariant = phase === 'hard' ? hardVariant : easyVariant;
   const questionText   = hasVariants ? currentVariant?.text : exercise.original;
@@ -63,15 +76,34 @@ function StudentPreview({ exercise, onClose }) {
 
   const isCorrect = submitted ? checkAnswer(answer, correctAnswer, exercise.type) : null;
 
+  const record = (correct) => {
+    if (recorded.current) return;
+    recorded.current = true;
+    const { progress, levelChange } = recordAttempt('student', correct);
+    setStreak(progress);
+    if (levelChange) {
+      setLevelMsg(levelChange);
+      setTimeout(() => setLevelMsg(null), 3000);
+    }
+  };
+
   const handleSubmit = () => {
     setSubmitted(true);
     setAttempts(a => a + 1);
   };
 
+  // Bij goed antwoord: sla op als correct
+  useEffect(() => {
+    if (submitted && isCorrect === true) {
+      record(true);
+    }
+  }, [submitted, isCorrect]);
+
   const handleNextLevel = () => {
     setAnswer('');
     setSubmitted(false);
     setAttempts(0);
+    recorded.current = false;
     setPhase('hard');
   };
 
@@ -80,7 +112,23 @@ function StudentPreview({ exercise, onClose }) {
     setSubmitted(false);
   };
 
-  const handleDone = () => setPhase('done');
+  const handleSkip = () => {
+    record(false);
+    if (phase === 'easy' && hasVariants) {
+      setAnswer('');
+      setSubmitted(false);
+      setAttempts(0);
+      recorded.current = false;
+      setPhase('hard');
+    } else {
+      setPhase('done');
+    }
+  };
+
+  const handleDone = () => {
+    record(true);
+    setPhase('done');
+  };
 
   // Auto-advance naar moeilijker bij goed antwoord (na 2s)
   useEffect(() => {
@@ -168,7 +216,7 @@ function StudentPreview({ exercise, onClose }) {
 
           {/* Niveau-indicator (alleen als er varianten zijn) */}
           {hasVariants && phase !== 'done' && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <div style={{
                 background: phase === 'easy' ? C.greenLight : '#f0f0f0',
                 color: phase === 'easy' ? C.green : C.textLight,
@@ -181,6 +229,48 @@ function StudentPreview({ exercise, onClose }) {
                 border: `1.5px solid ${phase === 'hard' ? C.pink : '#ddd'}`,
                 borderRadius: 99, padding: '4px 14px', fontSize: 11, fontWeight: 700,
               }}>② Moeilijker</div>
+            </div>
+          )}
+
+          {/* Streak voortgang */}
+          {phase !== 'done' && (
+            <div style={{ fontSize: 11, color: C.textMid, marginBottom: 14, display: 'flex', gap: 5, alignItems: 'center' }}>
+              {streak.level === 'easy' ? (
+                <>
+                  <span>Niveau: makkelijk</span>
+                  <span style={{ color: C.textLight }}>·</span>
+                  <span>{streak.correctStreak}/3 goed voor moeilijker</span>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 4,
+                      background: i < streak.correctStreak ? C.green : '#ddd' }} />
+                  ))}
+                </>
+              ) : (
+                <>
+                  <span style={{ fontWeight: 600 }}>Niveau: moeilijk</span>
+                  {streak.incorrectStreak > 0 && (
+                    <>
+                      <span style={{ color: C.textLight }}>·</span>
+                      <span>{streak.incorrectStreak}/2 fout voor makkelijker</span>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Level-up / level-down melding */}
+          {levelMsg && (
+            <div style={{
+              background: levelMsg === 'up' ? C.greenLight : '#FFF3E0',
+              border: `1.5px solid ${levelMsg === 'up' ? C.green : '#FF9800'}`,
+              borderRadius: 8, padding: '10px 14px', marginBottom: 14,
+              fontSize: 13, fontWeight: 700, textAlign: 'center',
+              color: levelMsg === 'up' ? C.green : '#E65100',
+            }}>
+              {levelMsg === 'up'
+                ? '⬆ Goed bezig! Je gaat naar moeilijker niveau.'
+                : '⬇ Geen zorgen! Je gaat terug naar het makkelijkere niveau.'}
             </div>
           )}
 
@@ -277,13 +367,11 @@ function StudentPreview({ exercise, onClose }) {
                           borderRadius: 8, padding: '11px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                         ↻ Opnieuw proberen
                       </button>
-                      {phase === 'easy' && hasVariants && (
-                        <button onClick={handleNextLevel}
-                          style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
-                            borderRadius: 8, padding: '11px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                          Toch verder →
-                        </button>
-                      )}
+                      <button onClick={handleSkip}
+                        style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
+                          borderRadius: 8, padding: '11px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                        {phase === 'easy' && hasVariants ? 'Toch verder →' : 'Toch afronden →'}
+                      </button>
                     </div>
                   )}
 
@@ -295,7 +383,7 @@ function StudentPreview({ exercise, onClose }) {
                     </button>
                   )}
 
-                  {phase === 'hard' && (
+                  {isCorrect !== false && phase === 'hard' && (
                     <button onClick={handleDone}
                       style={{ background: C.green, color: 'white', border: 'none',
                         borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
