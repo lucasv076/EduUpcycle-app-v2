@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
 import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import SubmissionHistory from '@/components/SubmissionHistory';
+import { getProgress, recordAttempt } from '@/lib/progress';
 
 // Generate or retrieve a stable session ID
 function getSessionId() {
@@ -58,6 +59,10 @@ export default function ExercisePage({ exercise }) {
   const [answer, setAnswer]       = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [attempts, setAttempts]   = useState(0);
+  const [streak, setStreak]       = useState({ correctStreak: 0, incorrectStreak: 0, level: 'easy', totalAttempts: 0, totalCorrect: 0 });
+  const [levelMsg, setLevelMsg]   = useState(null);
+  const recorded = useRef(false);
 
   // Initialize session ID on mount
   useEffect(() => {
@@ -85,6 +90,15 @@ export default function ExercisePage({ exercise }) {
   const isGoedFoutMode = activeBlockInteractionType === 'goedFout';
   const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
   const maxH = exercise.block_max_height || 5;
+
+  // Bij laden: haal opgeslagen studentniveau op
+  useEffect(() => {
+    const p = getProgress('student');
+    setStreak(p);
+    if (p.level === 'hard' && hasVariants) {
+      setPhase('hard');
+    }
+  }, [hasVariants]);
 
   const rawQuestionText = hasVariants
     ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
