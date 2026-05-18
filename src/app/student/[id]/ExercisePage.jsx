@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
 import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import SubmissionHistory from '@/components/SubmissionHistory';
+import { getProgress, recordAttempt } from '@/lib/progress';
 
 // Generate or retrieve a stable session ID
 function getSessionId() {
@@ -31,6 +32,10 @@ export default function ExercisePage({ exercise }) {
   const [answer, setAnswer]       = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [attempts, setAttempts]   = useState(0);
+  const [streak, setStreak]       = useState({ correctStreak: 0, incorrectStreak: 0, level: 'easy', totalAttempts: 0, totalCorrect: 0 });
+  const [levelMsg, setLevelMsg]   = useState(null);
+  const recorded = useRef(false);
 
   // Initialize session ID on mount
   useEffect(() => {
@@ -58,6 +63,8 @@ export default function ExercisePage({ exercise }) {
   const isGoedFoutMode = activeBlockInteractionType === 'goedFout';
   const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
   const maxH = exercise.block_max_height || 5;
+  const currentVariant = phase === 'hard' ? hardVariant : easyVariant;
+  const questionText = currentVariant?.text || exercise.original || exercise.title;
 
   // Bij laden: haal opgeslagen studentniveau op
   useEffect(() => {
@@ -89,6 +96,11 @@ export default function ExercisePage({ exercise }) {
             : true
     : null;
 
+  // For progress tracking: only block exercises have real validation; others are not auto-validatable
+  const isCorrect = submitted
+    ? isBlockQuestion ? isAnswerCorrect : null
+    : null;
+
   // Save submission when answer is submitted
   useEffect(() => {
     if (submitted && sessionId && answer) {
@@ -111,7 +123,29 @@ export default function ExercisePage({ exercise }) {
     }
   }, [submitted, sessionId, answer, exercise.id, isBlockQuestion, isAnswerCorrect, phase]);
 
-  const handleSubmit = () => setSubmitted(true);
+  // Registreer poging in streak/progress systeem
+  const record = (correct) => {
+    if (recorded.current) return;
+    recorded.current = true;
+    const { progress: updated, levelChange } = recordAttempt('student', correct);
+    setStreak(updated);
+    if (levelChange) {
+      setLevelMsg(levelChange);
+      setTimeout(() => setLevelMsg(null), 3000);
+    }
+  };
+
+  // Auto-record correct answers
+  useEffect(() => {
+    if (submitted && isCorrect === true) {
+      record(true);
+    }
+  }, [submitted, isCorrect]);
+
+  const handleSubmit = () => {
+    setAttempts(a => a + 1);
+    setSubmitted(true);
+  };
 
   const handleNextLevel = () => {
     setAnswer('');
@@ -301,10 +335,10 @@ export default function ExercisePage({ exercise }) {
           disabled={submitted} placeholder="Typ hier je antwoord..."
           onKeyDown={e => e.key === 'Enter' && answer && !submitted && handleSubmit()}
           style={{ border: `2px solid ${
-            submitted ? (isCorrect === false ? '#E53935' : C.green) : C.border
+            submitted ? (isAnswerCorrect === false ? '#E53935' : C.green) : C.border
           }`, borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
             color: C.text,
-            background: submitted ? (isCorrect === false ? '#FFEBEE' : C.greenLight) : C.white,
+            background: submitted ? (isAnswerCorrect === false ? '#FFEBEE' : C.greenLight) : C.white,
             fontFamily: 'inherit' }} />
       </div>
     );
@@ -329,7 +363,6 @@ export default function ExercisePage({ exercise }) {
             color: C.text, fontFamily: 'inherit', maxWidth: 500 }} />
       </div>
     );
-  };
 
     if (exercise.type === 'Meerkeuze') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
