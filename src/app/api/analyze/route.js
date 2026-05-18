@@ -468,22 +468,21 @@ export async function POST(request) {
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
+      const reason = data.choices?.[0]?.finish_reason || 'onbekend';
+      console.error('Geen content in Groq response:', JSON.stringify(data).slice(0, 300));
       return NextResponse.json(
-        { error: 'NO_RESPONSE', message: 'Geen antwoord van AI ontvangen.' },
+        { error: 'NO_RESPONSE', message: `Geen antwoord van AI (reden: ${reason}).` },
         { status: 500 }
       );
     }
 
-    // Parse JSON uit het antwoord (strip eventuele markdown code blocks)
+    // Parse JSON — meerdere strategieën
     let exercises;
     try {
       exercises = parseExercisesFromContent(content);
     } catch (e) {
-      console.error('JSON parse error:', e.message, '\nRaw content:', content);
-      return NextResponse.json(
-        { error: 'PARSE_ERROR', message: 'AI-antwoord kon niet worden geparsed als JSON.' },
-        { status: 500 }
-      );
+      console.error('JSON parse mislukt:', e.message, '\nRaw:', content.slice(0, 500));
+      exercises = [];
     }
 
     if (!Array.isArray(exercises)) {
