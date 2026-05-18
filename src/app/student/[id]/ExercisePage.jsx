@@ -27,9 +27,6 @@ const ZwijsenLogo = () => (
 );
 
 export default function ExercisePage({ exercise }) {
-  // phase: 'easy' → makkelijke variant
-  //        'hard' → moeilijke variant
-  //        'done' → klaar!
   const [phase, setPhase]         = useState('easy');
   const [answer, setAnswer]       = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -62,9 +59,14 @@ export default function ExercisePage({ exercise }) {
   const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
   const maxH = exercise.block_max_height || 5;
 
-  const questionText = hasVariants
-    ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
-    : exercise.original;
+  // Bij laden: haal opgeslagen studentniveau op
+  useEffect(() => {
+    const p = getProgress('student');
+    setStreak(p);
+    if (p.level === 'hard' && hasVariants) {
+      setPhase('hard');
+    }
+  }, [hasVariants]);
 
   // For block exercises, track whether the answer is actually correct
   const blockTotalCount = isTellenMode && exercise.block_plan_grid
@@ -114,12 +116,44 @@ export default function ExercisePage({ exercise }) {
   const handleNextLevel = () => {
     setAnswer('');
     setSubmitted(false);
+    setAttempts(0);
+    recorded.current = false;
     setPhase('hard');
   };
 
-  const handleDone = () => setPhase('done');
+  const handleRetry = () => {
+    setAnswer('');
+    setSubmitted(false);
+  };
 
-  // ── Input op basis van vraagtype ────────────────────────────────────
+  const handleSkip = () => {
+    record(false); // opgeven = fout voor streak
+    if (phase === 'easy' && hasVariants) {
+      setAnswer('');
+      setSubmitted(false);
+      setAttempts(0);
+      recorded.current = false;
+      setPhase('hard');
+    } else {
+      setPhase('done');
+    }
+  };
+
+  const handleDone = () => {
+    // Alleen als correct registreren als we echt weten dat het goed was
+    if (isCorrect === true) record(true);
+    setPhase('done');
+  };
+
+  // Auto-advance naar moeilijker bij goed antwoord (na 2s)
+  useEffect(() => {
+    if (submitted && isCorrect === true && phase === 'easy' && hasVariants) {
+      const t = setTimeout(handleNextLevel, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [submitted, isCorrect, phase, hasVariants]);
+
+  // ── Input op basis van vraagtype ──────────────────────────────────────
   const renderInput = () => {
     if (isBlockQuestion && isTellenMode) {
       const displayGrid = clampGrid(
@@ -265,9 +299,13 @@ export default function ExercisePage({ exercise }) {
         <label style={{ fontSize: 14, color: C.textMid, fontWeight: 500 }}>Jouw antwoord:</label>
         <input type="text" value={answer} onChange={e => setAnswer(e.target.value)}
           disabled={submitted} placeholder="Typ hier je antwoord..."
-          style={{ border: `2px solid ${submitted ? C.green : C.border}`,
-            borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
-            color: C.text, background: submitted ? C.greenLight : C.white, fontFamily: 'inherit' }} />
+          onKeyDown={e => e.key === 'Enter' && answer && !submitted && handleSubmit()}
+          style={{ border: `2px solid ${
+            submitted ? (isCorrect === false ? '#E53935' : C.green) : C.border
+          }`, borderRadius: 10, padding: '12px 16px', fontSize: 18, maxWidth: 280,
+            color: C.text,
+            background: submitted ? (isCorrect === false ? '#FFEBEE' : C.greenLight) : C.white,
+            fontFamily: 'inherit' }} />
       </div>
     );
 
@@ -291,6 +329,7 @@ export default function ExercisePage({ exercise }) {
             color: C.text, fontFamily: 'inherit', maxWidth: 500 }} />
       </div>
     );
+  };
 
     if (exercise.type === 'Meerkeuze') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
@@ -305,8 +344,6 @@ export default function ExercisePage({ exercise }) {
         ))}
       </div>
     );
-
-    return null;
   };
 
   return (
@@ -340,7 +377,7 @@ export default function ExercisePage({ exercise }) {
 
         {/* Niveau-indicator */}
         {hasVariants && phase !== 'done' && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <div style={{
               background: phase === 'easy' ? C.greenLight : '#f0f0f0',
               color: phase === 'easy' ? C.green : C.textLight,
@@ -353,6 +390,48 @@ export default function ExercisePage({ exercise }) {
               border: `1.5px solid ${phase === 'hard' ? C.pink : '#ddd'}`,
               borderRadius: 99, padding: '5px 16px', fontSize: 12, fontWeight: 700,
             }}>② Moeilijker</div>
+          </div>
+        )}
+
+        {/* Streak voortgang */}
+        {phase !== 'done' && (
+          <div style={{ fontSize: 12, color: C.textMid, marginBottom: 20, display: 'flex', gap: 6, alignItems: 'center' }}>
+            {streak.level === 'easy' ? (
+              <>
+                <span>Niveau: makkelijk</span>
+                <span style={{ color: C.textLight }}>·</span>
+                <span>{streak.correctStreak}/3 goed voor moeilijker</span>
+                {[0, 1, 2].map(i => (
+                  <span key={i} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4,
+                    background: i < streak.correctStreak ? C.green : '#ddd' }} />
+                ))}
+              </>
+            ) : (
+              <>
+                <span style={{ fontWeight: 600 }}>Niveau: moeilijk</span>
+                {streak.incorrectStreak > 0 && (
+                  <>
+                    <span style={{ color: C.textLight }}>·</span>
+                    <span>{streak.incorrectStreak}/2 fout voor makkelijker</span>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Level-up / level-down melding */}
+        {levelMsg && (
+          <div style={{
+            background: levelMsg === 'up' ? C.greenLight : '#FFF3E0',
+            border: `1.5px solid ${levelMsg === 'up' ? C.green : '#FF9800'}`,
+            borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+            fontSize: 14, fontWeight: 700, textAlign: 'center',
+            color: levelMsg === 'up' ? C.green : '#E65100',
+          }}>
+            {levelMsg === 'up'
+              ? '⬆ Goed bezig! Je gaat naar moeilijker niveau.'
+              : '⬇ Geen zorgen! Je gaat terug naar het makkelijkere niveau.'}
           </div>
         )}
 

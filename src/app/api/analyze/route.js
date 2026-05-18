@@ -1,9 +1,6 @@
 // ── API Route: /api/analyze ─────────────────────────────────────────
-// Ontvangt geëxtraheerde PDF-tekst en stuurt die naar Groq API
-// (OpenAI-compatible) om oefeningen te herkennen en te classificeren.
-//
-// Als er geen GROQ_API_KEY is geconfigureerd, returnt de route
-// een foutmelding zodat de client naar demo-modus kan switchen.
+// Gebruikt de native Gemini generateContent API (niet de OAI-compat laag)
+// zodat multimodale afbeeldingen betrouwbaar werken via inline_data.
 
 import { NextResponse } from 'next/server';
 import { SYSTEM_PROMPT } from '@/lib/ai-prompt';
@@ -459,25 +456,25 @@ export async function POST(request) {
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    // Native API response: candidates[0].content.parts[0].text
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
+      const reason = data.candidates?.[0]?.finishReason || 'onbekend';
+      console.error('Geen content in Gemini response:', JSON.stringify(data).slice(0, 300));
       return NextResponse.json(
-        { error: 'NO_RESPONSE', message: 'Geen antwoord van AI ontvangen.' },
+        { error: 'NO_RESPONSE', message: `Geen antwoord van AI (reden: ${reason}).` },
         { status: 500 }
       );
     }
 
-    // Parse JSON uit het antwoord (strip eventuele markdown code blocks)
+    // Parse JSON — meerdere strategieën
     let exercises;
     try {
       exercises = parseExercisesFromContent(content);
     } catch (e) {
-      console.error('JSON parse error:', e.message, '\nRaw content:', content);
-      return NextResponse.json(
-        { error: 'PARSE_ERROR', message: 'AI-antwoord kon niet worden geparsed als JSON.' },
-        { status: 500 }
-      );
+      console.error('JSON parse mislukt:', e.message, '\nRaw:', content.slice(0, 500));
+      exercises = [];
     }
 
     if (!Array.isArray(exercises)) {
