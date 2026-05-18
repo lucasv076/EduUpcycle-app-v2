@@ -126,7 +126,7 @@ function StudentPreview({ exercise, onClose }) {
   };
 
   const handleDone = () => {
-    record(true);
+    if (isCorrect === true) record(true);
     setPhase('done');
   };
 

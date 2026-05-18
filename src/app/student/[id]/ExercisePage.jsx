@@ -96,7 +96,8 @@ export default function ExercisePage({ exercise }) {
   };
 
   const handleDone = () => {
-    record(true); // afronden na hard = goed
+    // Alleen als correct registreren als we echt weten dat het goed was
+    if (isCorrect === true) record(true);
     setPhase('done');
   };
 
