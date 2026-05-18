@@ -465,6 +465,7 @@ export async function POST(request) {
     }
 
     const data = await response.json();
+    // Groq OpenAI-compatible response: choices[0].message.content
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
