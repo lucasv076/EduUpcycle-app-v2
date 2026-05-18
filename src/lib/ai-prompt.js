@@ -71,6 +71,7 @@ Voorbeeld 3×3-raster:
 - **Het block_interaction_type NOOIT veranderen in een variant.** Als het origineel "meerkeuze" is, zijn BEIDE varianten ook "meerkeuze". Als het origineel "bouwen" is, zijn BEIDE varianten ook "bouwen".
 - **De moeilijkheidsgraad zit in het bouwsel, NIET in de vraagvorm.** Een makkelijkere variant heeft een eenvoudiger grid (minder hoogteverschillen, minder vakjes maximaal 10 blokken). Een moeilijkere variant heeft meerdere vakjes met hogere blokken (tot max 5 hoog) en meer variatie in de getallen. Maar de vraagvorm blijft hetzelfde.
 - **De vraagstelling in de varianttekst moet bijna gelijk zijn aan het origineel** — alleen de instructie wordt iets meer of minder uitgebreid afhankelijk van het niveau.
+- **KRITIEK: Er zijn ALTIJD MAAR TWEE OPTIES (A en B).** Schrijf NOOIT "kies A, B of C" of "kies A, B, of C" — er bestaat geen optie C. De enige geldige formulering is "Kies A of B".
 
 Richtlijn per interaction_type:
 - **meerkeuze** — Makkelijker: "Kijk goed naar de plattegrond. Welk bouwsel past erbij? Kies A of B." | Moeilijker: "Welk bouwsel hoort bij de plattegrond? Kies uit A en B."

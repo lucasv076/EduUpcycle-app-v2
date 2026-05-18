@@ -219,12 +219,18 @@ function normalizeExercise(exercise, index, sourcePages) {
     ? exercise.variants
         .filter(v => v && typeof v.text === 'string' && v.text.trim().length > 0)
         .slice(0, 2)
-        .map((v, i) => ({
-          level: typeof v.level === 'string' && v.level.trim().length > 0
-            ? v.level.trim()
-            : (i === 0 ? 'Makkelijker' : 'Moeilijker'),
-          text: v.text.trim(),
-        }))
+        .map((v, i) => {
+          let text = v.text.trim();
+          if (question_type === 'blokken_bouwsel') {
+            text = text.replace(/\b[Aa]\s*,\s*[Bb]\s*,?\s*(?:of|en)\s+[Cc]\b/g, 'A of B');
+          }
+          return {
+            level: typeof v.level === 'string' && v.level.trim().length > 0
+              ? v.level.trim()
+              : (i === 0 ? 'Makkelijker' : 'Moeilijker'),
+            text,
+          };
+        })
     : [];
 
   return {

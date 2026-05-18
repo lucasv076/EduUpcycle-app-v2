@@ -62,9 +62,12 @@ export default function ExercisePage({ exercise }) {
   const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
   const maxH = exercise.block_max_height || 5;
 
-  const questionText = hasVariants
+  const rawQuestionText = hasVariants
     ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
     : exercise.original;
+  const questionText = isBlockQuestion
+    ? rawQuestionText.replace(/\b[Aa]\s*,\s*[Bb]\s*,?\s*(?:of|en)\s+[Cc]\b/g, 'A of B')
+    : rawQuestionText;
 
   // For block exercises, track whether the answer is actually correct
   const blockTotalCount = isTellenMode && exercise.block_plan_grid
