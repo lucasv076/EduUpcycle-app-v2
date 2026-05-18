@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
 import { checkAnswer } from '@/lib/answer-validation';
+import { getProgress, recordAttempt } from '@/lib/progress';
 
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -18,11 +19,23 @@ export default function ExercisePage({ exercise }) {
   const [phase, setPhase]         = useState('easy');
   const [answer, setAnswer]       = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [attempts, setAttempts]   = useState(0);  // bijhouden hoeveel pogingen
+  const [attempts, setAttempts]   = useState(0);  // pogingen per vraag (voor hint/antwoord tonen)
+  const [streak, setStreak]       = useState({ correctStreak: 0, incorrectStreak: 0, level: 'easy' });
+  const [levelMsg, setLevelMsg]   = useState(null); // 'up' | 'down' | null
+  const recorded = useRef(false); // voorkom dubbel opslaan
 
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
+
+  // Bij laden: haal opgeslagen studentniveau op
+  useEffect(() => {
+    const p = getProgress('student');
+    setStreak(p);
+    if (p.level === 'hard' && hasVariants) {
+      setPhase('hard');
+    }
+  }, [hasVariants]);
 
   const currentVariant = phase === 'hard' ? hardVariant : easyVariant;
   const questionText   = hasVariants ? currentVariant?.text : exercise.original;
@@ -32,15 +45,35 @@ export default function ExercisePage({ exercise }) {
 
   const isCorrect = submitted ? checkAnswer(answer, correctAnswer, exercise.type) : null;
 
+  // Sla resultaat op in streak (1x per fase)
+  const record = (correct) => {
+    if (recorded.current) return;
+    recorded.current = true;
+    const { progress, levelChange } = recordAttempt('student', correct);
+    setStreak(progress);
+    if (levelChange) {
+      setLevelMsg(levelChange);
+      setTimeout(() => setLevelMsg(null), 3000);
+    }
+  };
+
   const handleSubmit = () => {
     setSubmitted(true);
     setAttempts(a => a + 1);
   };
 
+  // Bij goed antwoord: sla op als correct
+  useEffect(() => {
+    if (submitted && isCorrect === true) {
+      record(true);
+    }
+  }, [submitted, isCorrect]);
+
   const handleNextLevel = () => {
     setAnswer('');
     setSubmitted(false);
     setAttempts(0);
+    recorded.current = false;
     setPhase('hard');
   };
 
@@ -49,7 +82,23 @@ export default function ExercisePage({ exercise }) {
     setSubmitted(false);
   };
 
-  const handleDone = () => setPhase('done');
+  const handleSkip = () => {
+    record(false); // opgeven = fout voor streak
+    if (phase === 'easy' && hasVariants) {
+      setAnswer('');
+      setSubmitted(false);
+      setAttempts(0);
+      recorded.current = false;
+      setPhase('hard');
+    } else {
+      setPhase('done');
+    }
+  };
+
+  const handleDone = () => {
+    record(true); // afronden na hard = goed
+    setPhase('done');
+  };
 
   // Auto-advance naar moeilijker bij goed antwoord (na 2s)
   useEffect(() => {
@@ -196,7 +245,7 @@ export default function ExercisePage({ exercise }) {
 
         {/* Niveau-indicator */}
         {hasVariants && phase !== 'done' && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <div style={{
               background: phase === 'easy' ? C.greenLight : '#f0f0f0',
               color: phase === 'easy' ? C.green : C.textLight,
@@ -209,6 +258,48 @@ export default function ExercisePage({ exercise }) {
               border: `1.5px solid ${phase === 'hard' ? C.pink : '#ddd'}`,
               borderRadius: 99, padding: '5px 16px', fontSize: 12, fontWeight: 700,
             }}>② Moeilijker</div>
+          </div>
+        )}
+
+        {/* Streak voortgang */}
+        {phase !== 'done' && (
+          <div style={{ fontSize: 12, color: C.textMid, marginBottom: 20, display: 'flex', gap: 6, alignItems: 'center' }}>
+            {streak.level === 'easy' ? (
+              <>
+                <span>Niveau: makkelijk</span>
+                <span style={{ color: C.textLight }}>·</span>
+                <span>{streak.correctStreak}/3 goed voor moeilijker</span>
+                {[0, 1, 2].map(i => (
+                  <span key={i} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4,
+                    background: i < streak.correctStreak ? C.green : '#ddd' }} />
+                ))}
+              </>
+            ) : (
+              <>
+                <span style={{ fontWeight: 600 }}>Niveau: moeilijk</span>
+                {streak.incorrectStreak > 0 && (
+                  <>
+                    <span style={{ color: C.textLight }}>·</span>
+                    <span>{streak.incorrectStreak}/2 fout voor makkelijker</span>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Level-up / level-down melding */}
+        {levelMsg && (
+          <div style={{
+            background: levelMsg === 'up' ? C.greenLight : '#FFF3E0',
+            border: `1.5px solid ${levelMsg === 'up' ? C.green : '#FF9800'}`,
+            borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+            fontSize: 14, fontWeight: 700, textAlign: 'center',
+            color: levelMsg === 'up' ? C.green : '#E65100',
+          }}>
+            {levelMsg === 'up'
+              ? '⬆ Goed bezig! Je gaat naar moeilijker niveau.'
+              : '⬇ Geen zorgen! Je gaat terug naar het makkelijkere niveau.'}
           </div>
         )}
 
@@ -265,20 +356,11 @@ export default function ExercisePage({ exercise }) {
                         borderRadius: 10, padding: '13px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
                       ↻ Opnieuw proberen
                     </button>
-                    {phase === 'easy' && hasVariants && (
-                      <button onClick={handleNextLevel}
-                        style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
-                          borderRadius: 10, padding: '13px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                        Toch verder →
-                      </button>
-                    )}
-                    {phase === 'hard' && (
-                      <button onClick={handleDone}
-                        style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
-                          borderRadius: 10, padding: '13px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                        Toch afronden →
-                      </button>
-                    )}
+                    <button onClick={handleSkip}
+                      style={{ background: 'white', color: C.textMid, border: `1.5px solid ${C.border}`,
+                        borderRadius: 10, padding: '13px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                      {phase === 'easy' && hasVariants ? 'Toch verder →' : 'Toch afronden →'}
+                    </button>
                   </div>
                 )}
 
