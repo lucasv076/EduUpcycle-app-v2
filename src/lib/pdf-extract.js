@@ -56,6 +56,43 @@ async function getPdfJs() {
 }
 
 /**
+ * Verwerkt een PNG/JPG-afbeelding als één "pagina" in hetzelfde formaat als extractPdfPages.
+ * @param {File} file - Het geüploade afbeeldingsbestand
+ * @returns {Promise<Array<{ page: number, text: string, imageDataUrl: string, aiImageDataUrl: string }>>}
+ */
+export function extractImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`Kan bestand niet lezen: ${file.name}`));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error(`Kan afbeelding niet laden: ${file.name}`));
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        const maxAiWidth = 1024;
+        const ratio = Math.min(1, maxAiWidth / canvas.width);
+        const aiCanvas = document.createElement('canvas');
+        aiCanvas.width = Math.max(1, Math.round(canvas.width * ratio));
+        aiCanvas.height = Math.max(1, Math.round(canvas.height * ratio));
+        const aiCtx = aiCanvas.getContext('2d');
+        aiCtx.drawImage(canvas, 0, 0, aiCanvas.width, aiCanvas.height);
+        const aiImageDataUrl = aiCanvas.toDataURL('image/jpeg', 0.82);
+
+        resolve([{ page: 1, text: '', imageDataUrl, aiImageDataUrl }]);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Extraheert tekst en renders per pagina uit een PDF-bestand.
  * @param {File} file - Het geüploade PDF-bestand
  * @returns {Promise<Array<{ page: number, text: string, imageDataUrl: string, aiImageDataUrl: string }>>}

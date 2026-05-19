@@ -31,6 +31,7 @@ function baseHeaders(extra = {}) {
 export async function saveExercises(exercises) {
   if (!isConfigured()) throw new Error('Supabase niet geconfigureerd');
 
+  const VALID_QT = ['blokken_bouwsel', 'vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'standaard'];
   const rows = exercises.map(ex => ({
     title:       ex.title,
     original:    ex.original,
@@ -40,8 +41,9 @@ export async function saveExercises(exercises) {
     topic:       ex.topic,
     format:      ex.format,
     note:        ex.note,
-    variants:    ex.variants ?? [],   // JSONB
-    question_type: ex.question_type === 'blokken_bouwsel' ? 'blokken_bouwsel' : 'standaard',
+    variants:    ex.variants ?? [],   // JSONB — includes rekensom_data per variant
+    rekensom_data: ex.rekensom_data ?? null,   // JSONB
+    question_type: VALID_QT.includes(ex.question_type) ? ex.question_type : 'standaard',
     source_file_type:
       ex.source_file_type === 'pdf_tabel' || ex.source_file_type === 'handmatig_json'
         ? ex.source_file_type
@@ -82,12 +84,13 @@ export async function saveExercises(exercises) {
     source_file: ex.source_file ?? null,
   }));
 
+  // Build fallback payloads: strip unknown columns one by one if DB hasn't been migrated yet.
   const payloadVariants = [
     rows,
-    rows.map(({ block_interaction_type, ...rest }) => rest),
+    rows.map(({ rekensom_data, ...rest }) => rest),
+    rows.map(({ rekensom_data, block_interaction_type, ...rest }) => rest),
   ];
 
-  // First try with block_interaction_type; retry without it if the column is missing.
   for (let i = 0; i < payloadVariants.length; i += 1) {
     const res = await fetch(`${URL_}/rest/v1/exercises`, {
       method:  'POST',
@@ -99,7 +102,7 @@ export async function saveExercises(exercises) {
 
     const txt = await res.text().catch(() => res.statusText);
 
-    if (i === 0 && res.status === 400 && txt.includes('block_interaction_type')) continue;
+    if (res.status === 400 && (txt.includes('rekensom_data') || txt.includes('block_interaction_type') || txt.includes('question_type'))) continue;
 
     throw new Error(`Supabase save fout (${res.status}): ${txt}`);
   }
@@ -135,8 +138,9 @@ export async function getAllExercises() {
     'block_option_a_grid', 'block_option_b_grid', 'block_correct_option',
   ];
 
-  // Try with block_interaction_type first; fall back without it if the column doesn't exist yet
+  // Try with new columns first, fall back gracefully if DB hasn't been migrated yet.
   for (const cols of [
+    [...BASE_COLS, 'block_interaction_type', 'rekensom_data'],
     [...BASE_COLS, 'block_interaction_type'],
     BASE_COLS,
   ]) {
@@ -149,8 +153,7 @@ export async function getAllExercises() {
 
     const txt = await res.text().catch(() => res.statusText);
 
-    // If the column simply doesn't exist yet, retry without it
-    if (res.status === 400 && txt.includes('block_interaction_type')) continue;
+    if (res.status === 400 && (txt.includes('block_interaction_type') || txt.includes('rekensom_data'))) continue;
 
     throw new Error(`Supabase list fout (${res.status}): ${txt}`);
   }

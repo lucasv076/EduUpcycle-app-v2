@@ -96,6 +96,13 @@ function buildUserContentParts(pages, includeImages = true) {
   return parts;
 }
 
+const VALID_QUESTION_TYPES = ['blokken_bouwsel', 'vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'standaard'];
+
+function normalizeRekensomData(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  return data;
+}
+
 function normalizeExercise(exercise, index, sourcePages) {
   const sourcePage = sourcePages[index % sourcePages.length] || {};
   const questionTypeRaw = typeof exercise?.question_type === 'string'
@@ -103,7 +110,17 @@ function normalizeExercise(exercise, index, sourcePages) {
     : typeof exercise?.vraagtype === 'string'
       ? exercise.vraagtype
       : null;
-  const question_type = questionTypeRaw === 'blokken_bouwsel' ? 'blokken_bouwsel' : 'standaard';
+  let question_type = VALID_QUESTION_TYPES.includes(questionTypeRaw) ? questionTypeRaw : 'standaard';
+
+  // Als het model question_type verkeerd teruggeeft maar wel rekensom_data heeft,
+  // leidt het juiste type af uit de data-structuur.
+  if (question_type === 'standaard' && exercise?.rekensom_data && typeof exercise.rekensom_data === 'object') {
+    const rd = exercise.rekensom_data;
+    if (Array.isArray(rd.sommen)        && rd.sommen.length > 0)     question_type = 'vul_in';
+    else if (Array.isArray(rd.stellingen) && rd.stellingen.length > 0) question_type = 'goed_fout';
+    else if (Array.isArray(rd.rijen)      && rd.rijen.length > 0)      question_type = 'vermenigvuldig_tabel';
+    else if (Array.isArray(rd.te_plaatsen) && rd.te_plaatsen.length > 0) question_type = 'getallenlijn';
+  }
 
   const sourceFileTypeRaw = typeof exercise?.source_file_type === 'string'
     ? exercise.source_file_type
@@ -215,6 +232,10 @@ function normalizeExercise(exercise, index, sourcePages) {
     ? Math.max(0, Math.min(100, Math.round(confidenceRaw)))
     : 70;
 
+  const rekensom_data = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'].includes(question_type)
+    ? normalizeRekensomData(exercise?.rekensom_data)
+    : null;
+
   const variants = Array.isArray(exercise?.variants)
     ? exercise.variants
         .filter(v => v && typeof v.text === 'string' && v.text.trim().length > 0)
@@ -229,6 +250,9 @@ function normalizeExercise(exercise, index, sourcePages) {
               ? v.level.trim()
               : (i === 0 ? 'Makkelijker' : 'Moeilijker'),
             text,
+            rekensom_data: ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'].includes(question_type)
+              ? normalizeRekensomData(v?.rekensom_data) ?? null
+              : null,
           };
         })
     : [];
@@ -258,6 +282,7 @@ function normalizeExercise(exercise, index, sourcePages) {
     block_correct_option: finalCorrectOption,
     block_auto_generated,
     block_max_height,
+    rekensom_data,
     confidence,
     difficulty: typeof exercise?.difficulty === 'string' && exercise.difficulty.trim().length > 0
       ? exercise.difficulty.trim()

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { C, TYPE_COLORS, confColor } from '@/lib/colors';
 import { DEMO_EXERCISES } from '@/lib/demo-data';
-import { extractPdfPages } from '@/lib/pdf-extract';
+import { extractPdfPages, extractImageFile } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
 import { BlokkenBouwselInteractive, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 
@@ -36,9 +36,9 @@ const ZwijsenLogo = ({ size = 14 }) => (
 );
 
 // ── Steps ─────────────────────────────────────────────────────────────
-const STEPS = ['PDF uploaden', 'AI verwerkt', 'Beoordelen', 'Klaar'];
+const STEPS = ['Bestanden uploaden', 'AI verwerkt', 'Beoordelen', 'Klaar'];
 const PROC = [
-  "PDF's analyseren en pagina's extraheren",
+  "Bestanden analyseren en pagina's/afbeeldingen extraheren",
   'Tekst per pagina extraheren',
   'Oefeningen herkennen en vraagtypes detecteren',
   'Interactieve varianten genereren',
@@ -46,16 +46,21 @@ const PROC = [
 
 // ── Student Preview Modal ─────────────────────────────────────────────
 function StudentPreview({ exercise, onClose }) {
-  // phase: 'easy' → leerling maakt de makkelijke variant
-  //        'hard' → leerling maakt de moeilijke variant
-  //        'done' → beide niveaus afgerond
   const [phase, setPhase]       = useState('easy');
   const [answer, setAnswer]     = useState('');
+  const [mathAnswers, setMathAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
 
-  const easyVariant = exercise.variants?.[0]; // { level: 'Makkelijker', text: '...' }
-  const hardVariant = exercise.variants?.[1]; // { level: 'Moeilijker',  text: '...' }
+  const easyVariant = exercise.variants?.[0];
+  const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
+
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel'];
+  const isMathType = MATH_TYPES.includes(exercise.question_type);
+  const activeRekensomData = isMathType
+    ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
+    : null;
+
   const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
   const VALID_BLOCK_TYPES = ['tellen', 'goedFout', 'bouwen', 'meerkeuze'];
   const blockInteractionType = isBlockQuestion
@@ -85,10 +90,98 @@ function StudentPreview({ exercise, onClose }) {
     ? (exercise.block_correct_option === 'A' ? 'Goed' : 'Fout') : null;
 
   const handleSubmit = () => setSubmitted(true);
-  const handleNextLevel = () => { setAnswer(''); setSubmitted(false); setPhase('hard'); };
+  const handleNextLevel = () => { setAnswer(''); setMathAnswers({}); setSubmitted(false); setPhase('hard'); };
   const handleDone = () => setPhase('done');
 
   const renderInput = () => {
+
+    // ── Vul in ──
+    if (exercise.question_type === 'vul_in' && activeRekensomData?.sommen) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {activeRekensomData.sommen.map((som, i) => {
+            const parts = som.tekst.split('___');
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8,
+                background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 14px' }}>
+                <span style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 700 }}>{parts[0]}</span>
+                <input type="number" value={mathAnswers[i] ?? ''} disabled={submitted}
+                  onChange={e => setMathAnswers(p => ({ ...p, [i]: e.target.value }))}
+                  placeholder="?" style={{ width: 64, fontSize: 18, fontWeight: 700, textAlign: 'center',
+                    border: `2px solid ${C.purple}`, borderRadius: 6, padding: '4px', fontFamily: 'monospace' }} />
+                {parts[1] && <span style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 700 }}>{parts[1]}</span>}
+                {submitted && <span style={{ fontSize: 12, color: Number(mathAnswers[i]) === som.antwoord ? C.green : C.red, fontWeight: 700 }}>
+                  {Number(mathAnswers[i]) === som.antwoord ? '✓' : `→ ${som.antwoord}`}
+                </span>}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Goed/Fout ──
+    if (exercise.question_type === 'goed_fout' && activeRekensomData?.stellingen) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {activeRekensomData.stellingen.map((s, i) => (
+            <div key={i} style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '10px 14px' }}>
+              <div style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 700, marginBottom: 8 }}>{s.tekst}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['Goed', 'Fout'].map(opt => (
+                  <button key={opt} type="button" disabled={submitted}
+                    onClick={() => !submitted && setMathAnswers(p => ({ ...p, [i]: opt }))}
+                    style={{ flex: 1, padding: '8px 0', borderRadius: 7, fontSize: 14, fontWeight: 700,
+                      border: `2px solid ${mathAnswers[i] === opt ? (opt === 'Goed' ? C.green : C.red) : C.border}`,
+                      background: mathAnswers[i] === opt ? (opt === 'Goed' ? C.greenLight : C.redLight) : C.white,
+                      color: mathAnswers[i] === opt ? (opt === 'Goed' ? C.green : C.red) : C.text,
+                      cursor: submitted ? 'default' : 'pointer' }}>
+                    {opt === 'Goed' ? '✓ Goed' : '✗ Fout'}
+                  </button>
+                ))}
+              </div>
+              {submitted && <div style={{ fontSize: 12, marginTop: 6, color: (mathAnswers[i] === 'Goed') === s.klopt ? C.green : C.red, fontWeight: 700 }}>
+                {(mathAnswers[i] === 'Goed') === s.klopt ? '✓ Correct' : `Antwoord: ${s.klopt ? 'Goed' : 'Fout'}`}
+              </div>}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ── Vermenigvuldig-tabel ──
+    if (exercise.question_type === 'vermenigvuldig_tabel' && activeRekensomData?.rijen) {
+      const { operator, factor, rijen } = activeRekensomData;
+      let bi = 0;
+      return (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ borderCollapse: 'separate', borderSpacing: 4, fontFamily: 'monospace', fontSize: 16, fontWeight: 700 }}>
+            <thead><tr>
+              <td style={{ background: C.purple, color: 'white', textAlign: 'center', padding: '6px 12px', borderRadius: 5 }}>{operator}</td>
+              {rijen.map((r, i) => <td key={i} style={{ background: C.purpleLight, color: C.purpleDark, textAlign: 'center', padding: '6px 12px', borderRadius: 5 }}>{r.getal}</td>)}
+            </tr></thead>
+            <tbody><tr>
+              <td style={{ background: C.purpleLight, color: C.purpleDark, textAlign: 'center', padding: '6px 12px', borderRadius: 5 }}>{factor}</td>
+              {rijen.map((r, i) => {
+                if (r.uitkomst !== null) return <td key={i} style={{ background: C.bg, textAlign: 'center', padding: '6px 12px', borderRadius: 5 }}>{r.uitkomst}</td>;
+                const idx = bi++;
+                return (
+                  <td key={i} style={{ border: `2px solid ${C.purple}`, borderRadius: 5, textAlign: 'center', padding: 3 }}>
+                    <input type="number" value={mathAnswers[idx] ?? ''} disabled={submitted}
+                      onChange={e => setMathAnswers(p => ({ ...p, [idx]: e.target.value }))}
+                      placeholder="?" style={{ width: 48, fontSize: 16, fontWeight: 700, textAlign: 'center', border: 'none', background: 'transparent', fontFamily: 'monospace' }} />
+                    {submitted && <div style={{ fontSize: 10, color: Number(mathAnswers[idx]) === r.antwoord ? C.green : C.red }}>
+                      {Number(mathAnswers[idx]) === r.antwoord ? '✓' : `→${r.antwoord}`}
+                    </div>}
+                  </td>
+                );
+              })}
+            </tr></tbody>
+          </table>
+        </div>
+      );
+    }
+
     if (isBlockQuestion && isTellenMode) {
       const displayGrid = clampGrid(
         exercise.block_goal_grid || exercise.block_plan_grid || exercise.block_option_a_grid, maxH);
@@ -307,10 +400,12 @@ function StudentPreview({ exercise, onClose }) {
 
               {/* Antwoord controleren / feedback */}
               {!submitted ? (
-                <button onClick={handleSubmit} disabled={!answer}
+                <button onClick={handleSubmit}
+                  disabled={isMathType ? Object.keys(mathAnswers).length === 0 : !answer}
                   style={{ marginTop: 20, background: C.purple, color: 'white', border: 'none',
                     borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14,
-                    opacity: answer ? 1 : 0.45, cursor: answer ? 'pointer' : 'not-allowed' }}>
+                    opacity: (isMathType ? Object.keys(mathAnswers).length > 0 : !!answer) ? 1 : 0.45,
+                    cursor: (isMathType ? Object.keys(mathAnswers).length > 0 : !!answer) ? 'pointer' : 'not-allowed' }}>
                   Antwoord controleren →
                 </button>
               ) : (
@@ -378,12 +473,14 @@ export default function EduUpcycleApp() {
 
   // ── File handling ───────────────────────────────────────────────────
   const handleFiles = useCallback((newFiles) => {
-    const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf');
-    if (pdfs.length === 0) {
-      setError('Selecteer alleen PDF-bestanden.');
+    const accepted = Array.from(newFiles).filter(
+      f => f.type === 'application/pdf' || f.type.startsWith('image/')
+    );
+    if (accepted.length === 0) {
+      setError('Selecteer PDF-, PNG- of JPG-bestanden.');
       return;
     }
-    setFiles(prev => [...prev, ...pdfs]);
+    setFiles(prev => [...prev, ...accepted]);
     setError(null);
   }, []);
 
@@ -399,29 +496,32 @@ export default function EduUpcycleApp() {
     setError(null);
 
     try {
-      // Stap 1 & 2: PDF extractie (client-side)
+      // Stap 1 & 2: extractie (client-side)
       setProcIdx(0);
-      setProcMsg(`${files.length} PDF-bestand(en) laden…`);
+      setProcMsg(`${files.length} bestand(en) laden…`);
 
       let allPages = [];
       for (let fi = 0; fi < files.length; fi++) {
-        setProcMsg(`Pagina's extraheren: ${files[fi].name}…`);
+        const file = files[fi];
+        setProcMsg(`Pagina's extraheren: ${file.name}…`);
         setProcIdx(0);
-        const pages = await extractPdfPages(files[fi]);
+        const pages = file.type === 'application/pdf'
+          ? await extractPdfPages(file)
+          : await extractImageFile(file);
         // Bewaar pagina-afbeeldingen
         const imgMap = {};
-        pages.forEach(p => { imgMap[`${files[fi].name}-p${p.page}`] = p.imageDataUrl; });
+        pages.forEach(p => { imgMap[`${file.name}-p${p.page}`] = p.imageDataUrl; });
         setPageImages(prev => ({ ...prev, ...imgMap }));
 
         allPages.push(...pages.map(p => ({
           ...p,
-          fileName: files[fi].name,
-          pageKey: `${files[fi].name}-p${p.page}`,
+          fileName: file.name,
+          pageKey: `${file.name}-p${p.page}`,
         })));
       }
 
       setProcIdx(1);
-      setProcMsg(`${allPages.length} pagina's geëxtraheerd`);
+      setProcMsg(`${allPages.length} pagina('s) geëxtraheerd`);
       await new Promise(r => setTimeout(r, 400));
 
       // Stap 3: AI analyse — in chunks van CHUNK_SIZE pagina's
@@ -429,9 +529,12 @@ export default function EduUpcycleApp() {
       // één grote request zou de Groq context-limiet overschrijden.
       const CHUNK_SIZE = 4;
 
-      // Filter pagina's zonder bruikbare tekst (lege pagina's, omslagen, etc.)
-      const textPages = allPages.filter(p => p.text && p.text.trim().length > 30);
-      const sourcePages = textPages.length > 0 ? textPages : allPages;
+      // Bewaar pagina's met tekst (PDF) of een vision-afbeelding (PNG/JPG).
+      // Afbeeldingsbestanden hebben geen tekst maar wél aiImageDataUrl.
+      let sourcePages = allPages.filter(
+        p => (p.text && p.text.trim().length > 30) || p.aiImageDataUrl
+      );
+      if (sourcePages.length === 0) sourcePages = allPages.slice(0, CHUNK_SIZE);
 
       const pageChunks = [];
       for (let i = 0; i < sourcePages.length; i += CHUNK_SIZE) {
@@ -680,8 +783,8 @@ export default function EduUpcycleApp() {
         {step === 0 && (
           <div className="fade" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, marginTop: 24 }}>
             <div style={{ textAlign: 'center' }}>
-              <h1 style={{ fontSize: 26, fontWeight: 800, color: C.purple, marginBottom: 6 }}>Werkboek-PDFs uploaden</h1>
-              <p style={{ color: C.textMid, fontSize: 14 }}>Sleep één of meerdere PDFs, of klik om te bladeren</p>
+              <h1 style={{ fontSize: 26, fontWeight: 800, color: C.purple, marginBottom: 6 }}>Bestanden uploaden</h1>
+              <p style={{ color: C.textMid, fontSize: 14 }}>Sleep PDF's of PNG/JPG-afbeeldingen, of klik om te bladeren</p>
             </div>
 
             {/* Drop zone */}
@@ -698,15 +801,15 @@ export default function EduUpcycleApp() {
                 justifyContent: 'center', gap: 12, padding: 28,
                 boxShadow: '0 2px 12px rgba(109,32,119,0.08)', transition: 'all 0.2s',
               }}>
-              <input ref={fileInputRef} type="file" accept=".pdf" multiple
+              <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg" multiple
                 style={{ display: 'none' }}
                 onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} />
               <div style={{ width: 56, height: 56, borderRadius: 14, background: C.purpleLight,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>📄</div>
               <div style={{ fontWeight: 700, color: C.purple, fontSize: 15 }}>
-                {files.length === 0 ? 'Sleep PDFs hier of klik om te bladeren' : `${files.length} bestand(en) geselecteerd`}
+                {files.length === 0 ? 'Sleep bestanden hier of klik om te bladeren' : `${files.length} bestand(en) geselecteerd`}
               </div>
-              <div style={{ fontSize: 12, color: C.textMid }}>Alleen PDF-bestanden · meerdere bestanden tegelijk mogelijk</div>
+              <div style={{ fontSize: 12, color: C.textMid }}>PDF · PNG · JPG · meerdere bestanden tegelijk mogelijk</div>
             </div>
 
             {/* File list */}
@@ -715,7 +818,7 @@ export default function EduUpcycleApp() {
                 {files.map((f, i) => (
                   <div key={i} style={{ background: C.white, border: `1px solid ${C.border}`,
                     borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 20 }}>📄</span>
+                    <span style={{ fontSize: 20 }}>{f.type === 'application/pdf' ? '📄' : '🖼'}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{f.name}</div>
                       <div style={{ fontSize: 11, color: C.textMid }}>{(f.size / 1024).toFixed(0)} KB</div>
@@ -737,12 +840,12 @@ export default function EduUpcycleApp() {
                   color: 'white', border: 'none', borderRadius: 9,
                   padding: '13px 36px', fontWeight: 700, fontSize: 15,
                   boxShadow: '0 2px 12px rgba(109,32,119,0.35)' }}>
-                {uploading ? 'Bezig…' : `Analyseer ${files.length} PDF${files.length > 1 ? "'s" : ''} →`}
+                {uploading ? 'Bezig…' : `Analyseer ${files.length} bestand${files.length > 1 ? 'en' : ''} →`}
               </button>
             )}
 
             <div style={{ display: 'flex', gap: 28, opacity: 0.6 }}>
-              {['PDF-extractie', 'AI-analyse', 'Varianten', 'Review-UI'].map(f => (
+              {['PDF & PNG/JPG', 'AI-analyse', 'Varianten', 'Review-UI'].map(f => (
                 <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.textMid }}>
                   <span style={{ color: C.green, fontWeight: 700 }}>✓</span> {f}
                 </div>
@@ -1142,7 +1245,7 @@ export default function EduUpcycleApp() {
               color: 'white', border: 'none', borderRadius: 9, padding: '13px 32px',
               fontWeight: 700, fontSize: 14, marginTop: 8,
               boxShadow: '0 2px 12px rgba(109,32,119,0.35)' }}>
-              Nieuwe PDF uploaden
+              Nieuwe bestanden uploaden
             </button>
           </div>
         )}

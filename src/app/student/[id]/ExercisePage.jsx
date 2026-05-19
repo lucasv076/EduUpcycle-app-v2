@@ -6,6 +6,7 @@ import { C } from '@/lib/colors';
 import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import SubmissionHistory from '@/components/SubmissionHistory';
 import { getProgress, recordAttempt } from '@/lib/progress';
+import { generateFreshRekensomData } from '@/lib/math-generator';
 
 // Generate or retrieve a stable session ID
 function getSessionId() {
@@ -25,6 +26,10 @@ const VAARDIGHEID_MAP = {
   'Meerkeuze':            'Je kiest het goede antwoord uit de opties.',
   'Tekenopgave':          'Je maakt een tekening of schets.',
   'Manipulatieopdracht':  'Je ordent, sorteert of verplaatst elementen.',
+  // Rekensommen
+  'vul_in':               'Je berekent de uitkomst en vult het lege vakje in.',
+  'goed_fout':            'Je controleert of de rekensom klopt en kiest Goed of Fout.',
+  'vermenigvuldig_tabel': 'Je vult de ontbrekende uitkomsten in de tabel in.',
   // Blokkenbouwsel per interactietype
   'blokken_meerkeuze':    'Je herkent welk 3D-bouwsel bij de plattegrond hoort.',
   'blokken_tellen':       'Je telt hoeveel blokjes er in het bouwsel zitten.',
@@ -32,14 +37,16 @@ const VAARDIGHEID_MAP = {
   'blokken_bouwen':       'Je vult zelf de plattegrond in bij een 3D-bouwsel.',
 };
 
-function buildLeerdoel(topic, type, blockInteractionType) {
+function buildLeerdoel(topic, type, blockInteractionType, questionType) {
   const parts = topic ? topic.split(/\s*[–—-]\s*/) : [];
   const vak  = parts.length >= 2 ? parts[0].trim() : null;
   const doel = parts.length >= 2 ? parts.slice(1).join(' – ').trim() : (topic || '');
 
   const key = type === 'Blokkenbouwsel' && blockInteractionType
     ? `blokken_${blockInteractionType}`
-    : type;
+    : questionType && questionType !== 'standaard' && questionType !== 'blokken_bouwsel'
+      ? questionType
+      : type;
   const vaardigheid = VAARDIGHEID_MAP[key] || null;
 
   return { vak, doel, vaardigheid };
@@ -57,7 +64,9 @@ const ZwijsenLogo = () => (
 export default function ExercisePage({ exercise }) {
   const [phase, setPhase]         = useState('easy');
   const [answer, setAnswer]       = useState('');
+  const [mathAnswers, setMathAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [currentRekensomData, setCurrentRekensomData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [attempts, setAttempts]   = useState(0);
   const [streak, setStreak]       = useState({ correctStreak: 0, incorrectStreak: 0, level: 'easy', totalAttempts: 0, totalCorrect: 0 });
@@ -72,6 +81,17 @@ export default function ExercisePage({ exercise }) {
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
+
+  // Math question type detection
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel'];
+  const isMathType = MATH_TYPES.includes(exercise.question_type);
+  const activeRekensomData = isMathType
+    ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
+    : null;
+
+  // Verse vragen worden gegenereerd via useEffect; tot die tijd valt terug op activeRekensomData
+  const displayRekensomData = currentRekensomData ?? activeRekensomData;
+
   const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
   const VALID_BLOCK_TYPES = ['tellen', 'goedFout', 'bouwen', 'meerkeuze'];
   const blockInteractionType = isBlockQuestion
@@ -100,6 +120,13 @@ export default function ExercisePage({ exercise }) {
     }
   }, [hasVariants]);
 
+  // Genereer verse rekensommen bij fase-start (5 willekeurige vragen per poging)
+  useEffect(() => {
+    if (!isMathType) return;
+    const data = (phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data;
+    setCurrentRekensomData(data ? generateFreshRekensomData(data, exercise.question_type, 5) : null);
+  }, [phase]);
+
   const rawQuestionText = hasVariants
     ? (phase === 'hard' ? hardVariant.text : easyVariant.text)
     : exercise.original;
@@ -116,21 +143,44 @@ export default function ExercisePage({ exercise }) {
     ? (exercise.block_correct_option === 'A' ? 'Goed' : 'Fout')
     : null;
 
-  const isAnswerCorrect = submitted
-    ? isBuildMode
-      ? gridsEqual(answer, exercise.block_plan_grid)
-      : isTellenMode
-        ? Number(answer) === blockTotalCount
-        : isGoedFoutMode
-          ? answer === goedFoutCorrectAnswer
-          : isBlockQuestion
-            ? answer === exercise.block_correct_option
-            : true
+  // Math correctness check
+  const mathIsCorrect = submitted && isMathType && displayRekensomData
+    ? (() => {
+        if (exercise.question_type === 'vul_in') {
+          const sommen = displayRekensomData.sommen || [];
+          return sommen.length > 0 && sommen.every((s, i) => Number(mathAnswers[i]) === s.antwoord);
+        }
+        if (exercise.question_type === 'goed_fout') {
+          const stellingen = displayRekensomData.stellingen || [];
+          return stellingen.length > 0 && stellingen.every((s, i) =>
+            (mathAnswers[i] === 'Goed') === s.klopt
+          );
+        }
+        if (exercise.question_type === 'vermenigvuldig_tabel') {
+          const blankRijen = (displayRekensomData.rijen || []).filter(r => r.uitkomst === null);
+          return blankRijen.length > 0 && blankRijen.every((r, i) => Number(mathAnswers[i]) === r.antwoord);
+        }
+        return false;
+      })()
     : null;
 
-  // For progress tracking: only block exercises have real validation; others are not auto-validatable
+  const isAnswerCorrect = submitted
+    ? isMathType
+      ? mathIsCorrect
+      : isBuildMode
+        ? gridsEqual(answer, exercise.block_plan_grid)
+        : isTellenMode
+          ? Number(answer) === blockTotalCount
+          : isGoedFoutMode
+            ? answer === goedFoutCorrectAnswer
+            : isBlockQuestion
+              ? answer === exercise.block_correct_option
+              : true
+    : null;
+
+  // For progress tracking: only block and math exercises have real validation
   const isCorrect = submitted
-    ? isBlockQuestion ? isAnswerCorrect : null
+    ? (isBlockQuestion || isMathType) ? isAnswerCorrect : null
     : null;
 
   // Save submission when answer is submitted
@@ -180,7 +230,9 @@ export default function ExercisePage({ exercise }) {
   };
 
   const handleNextLevel = () => {
+    setCurrentRekensomData(null);
     setAnswer('');
+    setMathAnswers({});
     setSubmitted(false);
     setAttempts(0);
     recorded.current = false;
@@ -189,13 +241,19 @@ export default function ExercisePage({ exercise }) {
 
   const handleRetry = () => {
     setAnswer('');
+    setMathAnswers({});
     setSubmitted(false);
+    if (isMathType) {
+      const data = (phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data;
+      setCurrentRekensomData(data ? generateFreshRekensomData(data, exercise.question_type, 5) : null);
+    }
   };
 
   const handleSkip = () => {
     record(false); // opgeven = fout voor streak
     if (phase === 'easy' && hasVariants) {
       setAnswer('');
+      setMathAnswers({});
       setSubmitted(false);
       setAttempts(0);
       recorded.current = false;
@@ -219,8 +277,202 @@ export default function ExercisePage({ exercise }) {
     }
   }, [submitted, isCorrect, phase, hasVariants]);
 
+  // ── Math: check of alle verplichte velden ingevuld zijn ──────────────
+  const mathAnswersComplete = isMathType && displayRekensomData
+    ? (() => {
+        if (exercise.question_type === 'vul_in') {
+          const sommen = displayRekensomData.sommen || [];
+          return sommen.length > 0 && sommen.every((_, i) => mathAnswers[i] !== undefined && mathAnswers[i] !== '');
+        }
+        if (exercise.question_type === 'goed_fout') {
+          const stellingen = displayRekensomData.stellingen || [];
+          return stellingen.length > 0 && stellingen.every((_, i) => mathAnswers[i] !== undefined);
+        }
+        if (exercise.question_type === 'vermenigvuldig_tabel') {
+          const blankRijen = (displayRekensomData.rijen || []).filter(r => r.uitkomst === null);
+          return blankRijen.length > 0 && blankRijen.every((_, i) => mathAnswers[i] !== undefined && mathAnswers[i] !== '');
+        }
+        return false;
+      })()
+    : false;
+
   // ── Input op basis van vraagtype ──────────────────────────────────────
   const renderInput = () => {
+
+    // ── Vul in: rekensom met lege vakjes ──
+    if (exercise.question_type === 'vul_in' && displayRekensomData?.sommen) {
+      const sommen = displayRekensomData.sommen;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {sommen.map((som, i) => {
+            const parts = som.tekst.split('___');
+            const userVal = mathAnswers[i] ?? '';
+            const isRight = submitted ? Number(userVal) === som.antwoord : null;
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: submitted ? (isRight ? C.greenLight : C.redLight) : C.bg,
+                border: `1.5px solid ${submitted ? (isRight ? C.green : C.red) : C.border}`,
+                borderRadius: 10, padding: '10px 16px', flexWrap: 'wrap',
+              }}>
+                <span style={{ fontSize: 20, fontFamily: 'monospace', fontWeight: 700, color: C.text }}>
+                  {parts[0]}
+                </span>
+                <input
+                  type="number"
+                  value={userVal}
+                  onChange={e => !submitted && setMathAnswers(prev => ({ ...prev, [i]: e.target.value }))}
+                  disabled={submitted}
+                  placeholder="?"
+                  style={{
+                    width: 72, fontSize: 20, fontWeight: 700, textAlign: 'center',
+                    border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
+                    borderRadius: 8, padding: '6px 4px', fontFamily: 'monospace',
+                    color: C.text, background: submitted ? 'transparent' : C.white,
+                  }}
+                />
+                {parts[1] && (
+                  <span style={{ fontSize: 20, fontFamily: 'monospace', fontWeight: 700, color: C.text }}>
+                    {parts[1]}
+                  </span>
+                )}
+                {submitted && !isRight && (
+                  <span style={{ fontSize: 13, color: C.red, fontWeight: 600, marginLeft: 6 }}>
+                    → {som.antwoord}
+                  </span>
+                )}
+                {submitted && isRight && (
+                  <span style={{ fontSize: 16, color: C.green, marginLeft: 6 }}>✓</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Goed/Fout: beoordelingsstellingen ──
+    if (exercise.question_type === 'goed_fout' && displayRekensomData?.stellingen) {
+      const stellingen = displayRekensomData.stellingen;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {stellingen.map((stelling, i) => {
+            const chosen = mathAnswers[i];
+            const correctAns = stelling.klopt ? 'Goed' : 'Fout';
+            const isRight = submitted ? chosen === correctAns : null;
+            return (
+              <div key={i} style={{
+                background: submitted ? (isRight ? C.greenLight : C.redLight) : C.bg,
+                border: `1.5px solid ${submitted ? (isRight ? C.green : C.red) : C.border}`,
+                borderRadius: 10, padding: '12px 16px',
+              }}>
+                <div style={{ fontSize: 19, fontFamily: 'monospace', fontWeight: 700, color: C.text, marginBottom: 10 }}>
+                  {stelling.tekst}
+                  {submitted && !isRight && (
+                    <span style={{ fontSize: 13, color: C.red, fontWeight: 600, marginLeft: 10 }}>
+                      (antwoord: {correctAns})
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {['Goed', 'Fout'].map(opt => (
+                    <button
+                      key={opt}
+                      type="button"
+                      disabled={submitted}
+                      onClick={() => !submitted && setMathAnswers(prev => ({ ...prev, [i]: opt }))}
+                      style={{
+                        flex: 1, padding: '10px 0', borderRadius: 8, fontSize: 15, fontWeight: 700,
+                        border: `2px solid ${chosen === opt ? (opt === 'Goed' ? C.green : C.red) : C.border}`,
+                        background: chosen === opt ? (opt === 'Goed' ? C.greenLight : C.redLight) : C.white,
+                        color: chosen === opt ? (opt === 'Goed' ? C.green : C.red) : C.text,
+                        cursor: submitted ? 'default' : 'pointer',
+                      }}
+                    >
+                      {opt === 'Goed' ? '✓ Goed' : '✗ Fout'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Vermenigvuldig-tabel ──
+    if (exercise.question_type === 'vermenigvuldig_tabel' && displayRekensomData?.rijen) {
+      const { operator, factor, rijen } = displayRekensomData;
+      let blankIndex = 0;
+      return (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{
+            borderCollapse: 'separate', borderSpacing: 4,
+            fontFamily: 'monospace', fontSize: 18, fontWeight: 700,
+          }}>
+            <thead>
+              <tr>
+                <td style={{
+                  background: C.purple, color: 'white', textAlign: 'center',
+                  padding: '8px 14px', borderRadius: 6, minWidth: 44,
+                }}>{operator}</td>
+                {rijen.map((r, i) => (
+                  <td key={i} style={{
+                    background: C.purpleLight, color: C.purpleDark, textAlign: 'center',
+                    padding: '8px 14px', borderRadius: 6, minWidth: 44,
+                  }}>{r.getal}</td>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{
+                  background: C.purpleLight, color: C.purpleDark, textAlign: 'center',
+                  padding: '8px 14px', borderRadius: 6,
+                }}>{factor}</td>
+                {rijen.map((r, i) => {
+                  if (r.uitkomst !== null) {
+                    return (
+                      <td key={i} style={{
+                        background: C.bg, color: C.text, textAlign: 'center',
+                        padding: '8px 14px', borderRadius: 6,
+                      }}>{r.uitkomst}</td>
+                    );
+                  }
+                  const idx = blankIndex++;
+                  const userVal = mathAnswers[idx] ?? '';
+                  const isRight = submitted ? Number(userVal) === r.antwoord : null;
+                  return (
+                    <td key={i} style={{
+                      background: submitted ? (isRight ? C.greenLight : C.redLight) : C.white,
+                      border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
+                      borderRadius: 6, textAlign: 'center', padding: 4,
+                    }}>
+                      <input
+                        type="number"
+                        value={userVal}
+                        onChange={e => !submitted && setMathAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
+                        disabled={submitted}
+                        placeholder="?"
+                        style={{
+                          width: 52, fontSize: 18, fontWeight: 700, textAlign: 'center',
+                          border: 'none', background: 'transparent',
+                          fontFamily: 'monospace', color: C.text,
+                        }}
+                      />
+                      {submitted && !isRight && (
+                        <div style={{ fontSize: 11, color: C.red }}>→{r.antwoord}</div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
     if (isBlockQuestion && isTellenMode) {
       const displayGrid = clampGrid(
         exercise.block_goal_grid || exercise.block_plan_grid || exercise.block_option_a_grid,
@@ -468,7 +720,7 @@ export default function ExercisePage({ exercise }) {
 
         {/* Leerdoel-balk */}
         {(() => {
-          const ld = buildLeerdoel(exercise.topic, exercise.type, blockInteractionType);
+          const ld = buildLeerdoel(exercise.topic, exercise.type, blockInteractionType, exercise.question_type);
           return (
             <div style={{
               display: 'flex', alignItems: 'flex-start', gap: 12,
@@ -598,10 +850,11 @@ export default function ExercisePage({ exercise }) {
 
             {/* Submit / feedback */}
             {!submitted ? (
-              <button type="button" onClick={handleSubmit} disabled={!answer}
+              <button type="button" onClick={handleSubmit} disabled={isMathType ? !mathAnswersComplete : !answer}
                 style={{ marginTop: 24, background: C.purple, color: 'white', border: 'none',
                   borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
-                  opacity: answer ? 1 : 0.4, cursor: answer ? 'pointer' : 'not-allowed' }}>
+                  opacity: (isMathType ? mathAnswersComplete : !!answer) ? 1 : 0.4,
+                  cursor: (isMathType ? mathAnswersComplete : !!answer) ? 'pointer' : 'not-allowed' }}>
                 Antwoord controleren →
               </button>
             ) : (
@@ -620,11 +873,13 @@ export default function ExercisePage({ exercise }) {
                     </div>
                     <div style={{ fontSize: 13, color: C.text }}>
                       {isAnswerCorrect === false
-                        ? isTellenMode
-                          ? `Tel nog eens! Het goede antwoord is ${blockTotalCount}.`
-                          : isGoedFoutMode
-                            ? `Niet goed. Het antwoord is: ${goedFoutCorrectAnswer}.`
-                            : 'Kijk nog eens goed naar de plattegrond.'
+                        ? isMathType
+                          ? 'Kijk naar de rode vakjes — het goede antwoord staat erbij.'
+                          : isTellenMode
+                            ? `Tel nog eens! Het goede antwoord is ${blockTotalCount}.`
+                            : isGoedFoutMode
+                              ? `Niet goed. Het antwoord is: ${goedFoutCorrectAnswer}.`
+                              : 'Kijk nog eens goed naar de plattegrond.'
                         : phase === 'easy' && hasVariants
                           ? 'Klaar voor de moeilijkere versie?'
                           : 'Je hebt de oefening afgerond!'}
@@ -633,21 +888,38 @@ export default function ExercisePage({ exercise }) {
                 )}
 
                 {phase === 'easy' && hasVariants && (
-                  <button type="button" onClick={handleNextLevel}
-                    style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`,
-                      color: 'white', border: 'none', borderRadius: 10,
-                      padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                    Moeilijkere versie proberen →
-                  </button>
+                  isAnswerCorrect === false && isMathType ? (
+                    <button type="button" onClick={handleRetry}
+                      style={{ background: C.purple, color: 'white', border: 'none',
+                        borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                      ← Probeer opnieuw met nieuwe sommen
+                    </button>
+                  ) : (
+                    <button type="button" onClick={handleNextLevel}
+                      style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`,
+                        color: 'white', border: 'none', borderRadius: 10,
+                        padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                      Moeilijkere versie proberen →
+                    </button>
+                  )
                 )}
 
                 {phase === 'hard' && (
-                  <button type="button" onClick={handleDone}
-                    style={{ background: C.green, color: 'white', border: 'none',
-                      borderRadius: 10, padding: '13px 32px', fontWeight: 700,
-                      fontSize: 15, cursor: 'pointer', marginTop: isBuildMode ? 12 : 0 }}>
-                    🎉 Afronden
-                  </button>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: isBuildMode ? 12 : 0 }}>
+                    {isAnswerCorrect === false && isMathType && (
+                      <button type="button" onClick={handleRetry}
+                        style={{ background: C.purple, color: 'white', border: 'none',
+                          borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                        ← Probeer opnieuw
+                      </button>
+                    )}
+                    <button type="button" onClick={handleDone}
+                      style={{ background: C.green, color: 'white', border: 'none',
+                        borderRadius: 10, padding: '13px 32px', fontWeight: 700,
+                        fontSize: 15, cursor: 'pointer' }}>
+                      🎉 Afronden
+                    </button>
+                  </div>
                 )}
               </div>
             )}
