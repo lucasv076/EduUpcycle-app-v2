@@ -6,6 +6,7 @@ import { DEMO_EXERCISES } from '@/lib/demo-data';
 import { extractPdfPages, extractImageFile } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
 import { BlokkenBouwselInteractive, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
+import { GetallenLijnInteractief } from '@/components/getallenlijn';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
 const Badge = ({ label, bg, color, small }) => (
@@ -55,7 +56,7 @@ function StudentPreview({ exercise, onClose }) {
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
 
-  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel'];
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'];
   const isMathType = MATH_TYPES.includes(exercise.question_type);
   const activeRekensomData = isMathType
     ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
@@ -179,6 +180,19 @@ function StudentPreview({ exercise, onClose }) {
             </tr></tbody>
           </table>
         </div>
+      );
+    }
+
+    // ── Getallenlijn ──
+    if (exercise.question_type === 'getallenlijn' && activeRekensomData?.te_plaatsen) {
+      return (
+        <GetallenLijnInteractief
+          key={`gl-${phase}`}
+          data={activeRekensomData}
+          submitted={submitted}
+          disabled={submitted}
+          onPlacementsChange={(placements) => setMathAnswers(placements)}
+        />
       );
     }
 

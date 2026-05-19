@@ -9,7 +9,8 @@
       "mcp__Claude_in_Chrome__read_network_requests",
       "Bash(node -e \"try { const m = require\\('pdfjs-dist/package.json'\\); console.log\\(m.version\\); } catch\\(e\\) { console.log\\('not found:', e.message\\); }\")",
       "PowerShell(git push origin main 2>&1)",
-      "PowerShell(Get-ChildItem -LiteralPath \"C:\\\\Users\\\\yangr\\\\Downloads\\\\semsom_interactief_v4\" -Recurse -File | ForEach-Object { $_.FullName })"
+      "PowerShell(Get-ChildItem -LiteralPath \"C:\\\\Users\\\\yangr\\\\Downloads\\\\semsom_interactief_v4\" -Recurse -File | ForEach-Object { $_.FullName })",
+      "Bash(node -e ' *)"
     ]
   }
 }

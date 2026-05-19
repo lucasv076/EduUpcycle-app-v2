@@ -85,12 +85,22 @@ export async function saveExercises(exercises) {
   }));
 
   // Build fallback payloads: strip unknown columns one by one if DB hasn't been migrated yet.
+  // Last resort: normalize question_type to 'standaard' so old DBs can still accept the row.
+  const normalizeQt = row => ({
+    ...row,
+    question_type: ['blokken_bouwsel', 'vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'standaard'].includes(row.question_type)
+      ? row.question_type
+      : 'standaard',
+  });
+
   const payloadVariants = [
     rows,
     rows.map(({ rekensom_data, ...rest }) => rest),
     rows.map(({ rekensom_data, block_interaction_type, ...rest }) => rest),
+    rows.map(({ rekensom_data, block_interaction_type, ...rest }) => normalizeQt(rest)),
   ];
 
+  let lastError = null;
   for (let i = 0; i < payloadVariants.length; i += 1) {
     const res = await fetch(`${URL_}/rest/v1/exercises`, {
       method:  'POST',
@@ -101,11 +111,14 @@ export async function saveExercises(exercises) {
     if (res.ok) return res.json();
 
     const txt = await res.text().catch(() => res.statusText);
+    lastError = `Supabase save fout (${res.status}): ${txt}`;
 
     if (res.status === 400 && (txt.includes('rekensom_data') || txt.includes('block_interaction_type') || txt.includes('question_type'))) continue;
 
-    throw new Error(`Supabase save fout (${res.status}): ${txt}`);
+    throw new Error(lastError);
   }
+
+  throw new Error(lastError || 'Opslaan mislukt: alle fallbacks uitgeput. Voer npm run db:push uit.');
 }
 
 // ── Één oefening ophalen op UUID ──────────────────────────────────────

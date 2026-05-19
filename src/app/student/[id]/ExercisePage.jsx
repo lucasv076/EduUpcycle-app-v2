@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { C } from '@/lib/colors';
 import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
+import { GetallenLijnInteractief } from '@/components/getallenlijn';
 import SubmissionHistory from '@/components/SubmissionHistory';
 import { getProgress, recordAttempt } from '@/lib/progress';
 import { generateFreshRekensomData } from '@/lib/math-generator';
@@ -30,6 +31,7 @@ const VAARDIGHEID_MAP = {
   'vul_in':               'Je berekent de uitkomst en vult het lege vakje in.',
   'goed_fout':            'Je controleert of de rekensom klopt en kiest Goed of Fout.',
   'vermenigvuldig_tabel': 'Je vult de ontbrekende uitkomsten in de tabel in.',
+  'getallenlijn':         'Je plaatst de getallen op de juiste plek op de getallenlijn.',
   // Blokkenbouwsel per interactietype
   'blokken_meerkeuze':    'Je herkent welk 3D-bouwsel bij de plattegrond hoort.',
   'blokken_tellen':       'Je telt hoeveel blokjes er in het bouwsel zitten.',
@@ -67,6 +69,7 @@ export default function ExercisePage({ exercise }) {
   const [mathAnswers, setMathAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [currentRekensomData, setCurrentRekensomData] = useState(null);
+  const [inputKey, setInputKey]   = useState(0);
   const [sessionId, setSessionId] = useState(null);
   const [attempts, setAttempts]   = useState(0);
   const [streak, setStreak]       = useState({ correctStreak: 0, incorrectStreak: 0, level: 'easy', totalAttempts: 0, totalCorrect: 0 });
@@ -83,7 +86,7 @@ export default function ExercisePage({ exercise }) {
   const hasVariants = !!(easyVariant && hardVariant);
 
   // Math question type detection
-  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel'];
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'];
   const isMathType = MATH_TYPES.includes(exercise.question_type);
   const activeRekensomData = isMathType
     ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
@@ -159,6 +162,10 @@ export default function ExercisePage({ exercise }) {
         if (exercise.question_type === 'vermenigvuldig_tabel') {
           const blankRijen = (displayRekensomData.rijen || []).filter(r => r.uitkomst === null);
           return blankRijen.length > 0 && blankRijen.every((r, i) => Number(mathAnswers[i]) === r.antwoord);
+        }
+        if (exercise.question_type === 'getallenlijn') {
+          const positions = displayRekensomData.te_plaatsen || [];
+          return positions.length > 0 && positions.every(pos => Number(mathAnswers[pos]) === pos);
         }
         return false;
       })()
@@ -236,6 +243,7 @@ export default function ExercisePage({ exercise }) {
     setSubmitted(false);
     setAttempts(0);
     recorded.current = false;
+    setInputKey(k => k + 1);
     setPhase('hard');
   };
 
@@ -243,6 +251,7 @@ export default function ExercisePage({ exercise }) {
     setAnswer('');
     setMathAnswers({});
     setSubmitted(false);
+    setInputKey(k => k + 1);
     if (isMathType) {
       const data = (phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data;
       setCurrentRekensomData(data ? generateFreshRekensomData(data, exercise.question_type, 5) : null);
@@ -291,6 +300,10 @@ export default function ExercisePage({ exercise }) {
         if (exercise.question_type === 'vermenigvuldig_tabel') {
           const blankRijen = (displayRekensomData.rijen || []).filter(r => r.uitkomst === null);
           return blankRijen.length > 0 && blankRijen.every((_, i) => mathAnswers[i] !== undefined && mathAnswers[i] !== '');
+        }
+        if (exercise.question_type === 'getallenlijn') {
+          const positions = displayRekensomData.te_plaatsen || [];
+          return positions.length > 0 && positions.every(pos => mathAnswers[pos] !== undefined);
         }
         return false;
       })()
@@ -470,6 +483,19 @@ export default function ExercisePage({ exercise }) {
             </tbody>
           </table>
         </div>
+      );
+    }
+
+    // ── Getallenlijn: sleep getallen naar de juiste plek ──
+    if (exercise.question_type === 'getallenlijn' && displayRekensomData?.te_plaatsen) {
+      return (
+        <GetallenLijnInteractief
+          key={`gl-${phase}-${inputKey}`}
+          data={displayRekensomData}
+          submitted={submitted}
+          disabled={submitted}
+          onPlacementsChange={(placements) => setMathAnswers(placements)}
+        />
       );
     }
 
