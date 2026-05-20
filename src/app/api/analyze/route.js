@@ -96,7 +96,7 @@ function buildUserContentParts(pages, includeImages = true) {
   return parts;
 }
 
-const VALID_QUESTION_TYPES = ['blokken_bouwsel', 'vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'standaard'];
+const VALID_QUESTION_TYPES = ['blokken_bouwsel', 'vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen', 'standaard'];
 
 function normalizeRekensomData(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
@@ -120,6 +120,7 @@ function normalizeExercise(exercise, index, sourcePages) {
     else if (Array.isArray(rd.stellingen) && rd.stellingen.length > 0) question_type = 'goed_fout';
     else if (Array.isArray(rd.rijen)      && rd.rijen.length > 0)      question_type = 'vermenigvuldig_tabel';
     else if (Array.isArray(rd.te_plaatsen) && rd.te_plaatsen.length > 0) question_type = 'getallenlijn';
+    else if (Array.isArray(rd.items) && rd.items.length > 0) question_type = 'geld_tellen';
   }
 
   const sourceFileTypeRaw = typeof exercise?.source_file_type === 'string'
@@ -232,7 +233,7 @@ function normalizeExercise(exercise, index, sourcePages) {
     ? Math.max(0, Math.min(100, Math.round(confidenceRaw)))
     : 70;
 
-  const rekensom_data = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'].includes(question_type)
+  const rekensom_data = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen'].includes(question_type)
     ? normalizeRekensomData(exercise?.rekensom_data)
     : null;
 
@@ -250,7 +251,7 @@ function normalizeExercise(exercise, index, sourcePages) {
               ? v.level.trim()
               : (i === 0 ? 'Makkelijker' : 'Moeilijker'),
             text,
-            rekensom_data: ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'].includes(question_type)
+            rekensom_data: ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen'].includes(question_type)
               ? normalizeRekensomData(v?.rekensom_data) ?? null
               : null,
           };

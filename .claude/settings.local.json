@@ -12,7 +12,10 @@
       "PowerShell(Get-ChildItem -LiteralPath \"C:\\\\Users\\\\yangr\\\\Downloads\\\\semsom_interactief_v4\" -Recurse -File | ForEach-Object { $_.FullName })",
       "Bash(node -e ' *)",
       "Bash(curl -s -o NUL -w \"%{http_code}\" \"https://cauesbzdsichwpiwpexe.supabase.co/rest/v1/exercises?select=id&limit=1\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhdWVzYnpkc2ljaHdwaXdwZXhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTE4MTksImV4cCI6MjA5MjUyNzgxOX0.of0O2xMX6F76r6bX7_FBpgKbWlN1kqNuyu8xo2DNPhE\")",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(npm run *)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\yangr\\\\EduUpcycle-app-v2\\\\src\\\\app\\\\api\\\\generate-image\")",
+      "Bash(Out-Null)"
     ]
   }
 }

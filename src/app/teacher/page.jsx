@@ -7,7 +7,8 @@ import { extractPdfPages, extractImageFile } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
 import { BlokkenBouwselInteractive, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import { GetallenLijnInteractief } from '@/components/getallenlijn';
-import { THEMA_EMOJIS, parseSomNums } from '@/lib/math-generator';
+import { GeldTellenInteractief } from '@/components/geld-tellen';
+import { THEMA_EMOJIS, parseSomNums, randomThema } from '@/lib/math-generator';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
 const Badge = ({ label, bg, color, small }) => (
@@ -81,12 +82,14 @@ function StudentPreview({ exercise, onClose }) {
   const [answer, setAnswer]     = useState('');
   const [mathAnswers, setMathAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [attempts, setAttempts]   = useState(0);
+  const [fallbackThema] = useState(randomThema);
 
   const easyVariant = exercise.variants?.[0];
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
 
-  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'];
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen'];
   const isMathType = MATH_TYPES.includes(exercise.question_type);
   const activeRekensomData = isMathType
     ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
@@ -120,8 +123,9 @@ function StudentPreview({ exercise, onClose }) {
   const goedFoutCorrect = isGoedFoutMode
     ? (exercise.block_correct_option === 'A' ? 'Goed' : 'Fout') : null;
 
-  const handleSubmit = () => setSubmitted(true);
-  const handleNextLevel = () => { setAnswer(''); setMathAnswers({}); setSubmitted(false); setPhase('hard'); };
+  const handleSubmit = () => { setAttempts(a => a + 1); setSubmitted(true); };
+  const handleRetry  = () => { setAnswer(''); setMathAnswers({}); setSubmitted(false); };
+  const handleNextLevel = () => { setAnswer(''); setMathAnswers({}); setSubmitted(false); setAttempts(0); setPhase('hard'); };
   const handleDone = () => setPhase('done');
 
   const mathIsCorrect = submitted && isMathType && activeRekensomData
@@ -141,6 +145,16 @@ function StudentPreview({ exercise, onClose }) {
         if (exercise.question_type === 'getallenlijn') {
           const positions = activeRekensomData.te_plaatsen || [];
           return positions.length > 0 && positions.every(pos => Number(mathAnswers[pos]) === pos);
+        }
+        if (exercise.question_type === 'geld_tellen') {
+          const gvt = activeRekensomData?.geld_vraag_type || 'invul';
+          if (gvt === 'meerkeuze')
+            return parseInt(mathAnswers[0]) === activeRekensomData?.correct_optie;
+          if (gvt === 'goed_fout')
+            return (mathAnswers[0] === 'Goed') === activeRekensomData?.klopt;
+          const inputVal = String(mathAnswers[0] || '').replace(',', '.').trim();
+          const studentAmount = parseFloat(inputVal);
+          return !isNaN(studentAmount) && activeRekensomData?.totaal != null && Math.abs(studentAmount - activeRekensomData.totaal) < 0.005;
         }
         return false;
       })()
@@ -162,7 +176,7 @@ function StudentPreview({ exercise, onClose }) {
 
     // ── Vul in ──
     if (exercise.question_type === 'vul_in' && activeRekensomData?.sommen) {
-      const emoji = THEMA_EMOJIS[activeRekensomData.thema] || null;
+      const emoji = THEMA_EMOJIS[activeRekensomData.thema || fallbackThema] || null;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {activeRekensomData.sommen.map((som, i) => {
@@ -184,7 +198,7 @@ function StudentPreview({ exercise, onClose }) {
                 {submitted && <span style={{ fontSize: 12, color: isRight ? C.green : C.red, fontWeight: 700 }}>
                   {isRight ? '✓' : `→ ${som.antwoord}`}
                 </span>}
-                {!submitted && <EmojiHint som={som} emoji={emoji} />}
+                {!submitted && attempts > 0 && <EmojiHint som={som} emoji={emoji} />}
               </div>
             );
           })}
@@ -263,6 +277,20 @@ function StudentPreview({ exercise, onClose }) {
           submitted={submitted}
           disabled={submitted}
           onPlacementsChange={(placements) => setMathAnswers(placements)}
+        />
+      );
+    }
+
+    // ── Geld tellen ──
+    if (exercise.question_type === 'geld_tellen' && activeRekensomData?.items) {
+      return (
+        <GeldTellenInteractief
+          key={`gt-${phase}`}
+          data={activeRekensomData}
+          submitted={submitted}
+          value={mathAnswers[0] ?? ''}
+          onAnswerChange={(val) => setMathAnswers(p => ({ ...p, 0: val }))}
+          isCorrect={submitted ? mathIsCorrect : null}
         />
       );
     }
@@ -516,21 +544,31 @@ function StudentPreview({ exercise, onClose }) {
                     </div>
                   </div>
 
-                  {phase === 'easy' && hasVariants && (
-                    <button onClick={handleNextLevel}
-                      style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`, color: 'white',
-                        border: 'none', borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
-                      Moeilijkere versie proberen →
-                    </button>
-                  )}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {isAnswerCorrect === false && isMathType && (
+                      <button onClick={handleRetry}
+                        style={{ background: C.purple, color: 'white', border: 'none',
+                          borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
+                        Opnieuw proberen →
+                      </button>
+                    )}
 
-                  {phase === 'hard' && (
-                    <button onClick={handleDone}
-                      style={{ background: C.green, color: 'white', border: 'none',
-                        borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
-                      🎉 Afronden
-                    </button>
-                  )}
+                    {phase === 'easy' && hasVariants && (
+                      <button onClick={handleNextLevel}
+                        style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`, color: 'white',
+                          border: 'none', borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
+                        Moeilijkere versie proberen →
+                      </button>
+                    )}
+
+                    {phase === 'hard' && (
+                      <button onClick={handleDone}
+                        style={{ background: C.green, color: 'white', border: 'none',
+                          borderRadius: 8, padding: '11px 28px', fontWeight: 700, fontSize: 14 }}>
+                        🎉 Afronden
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </>

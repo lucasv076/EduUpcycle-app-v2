@@ -31,7 +31,7 @@ function baseHeaders(extra = {}) {
 export async function saveExercises(exercises) {
   if (!isConfigured()) throw new Error('Supabase niet geconfigureerd');
 
-  const VALID_QT = ['blokken_bouwsel', 'vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'standaard'];
+  const VALID_QT = ['blokken_bouwsel', 'vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen', 'standaard'];
   const rows = exercises.map(ex => ({
     title:       ex.title,
     original:    ex.original,

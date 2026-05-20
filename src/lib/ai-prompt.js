@@ -16,13 +16,14 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 | "vermenigvuldig_tabel" | Tabelstructuur met vaste factor en invulvakjes | × 3 4 / 5 __ __ |
 | "getallenlijn" | Getallen op de juiste plek zetten op een getallenlijn | Sleep 4, 8 en 14 naar de lijn 0–20 |
 | "blokken_bouwsel" | 3D isometrisch blokkenbouwsel-opdracht | Zie sectie hieronder |
+| "geld_tellen"    | Euro briefjes en munten tellen of wisselgeld berekenen | Hoeveel is €10 + 3×€2 + 2×50ct? |
 | "standaard" | Open vragen, tekenen, schrijven, overige opdrachten | "Schrijf op wat je ziet" |
 
 ## Per oefening lever je:
 1. **title**: Korte beschrijvende titel (max 8 woorden)
 2. **original**: Exacte originele tekst uit de PDF
 3. **type**: Kies uit: "Open vraag", "Invulvraag", "Meerkeuze", "Tekenopgave", "Manipulatieopdracht", "Blokkenbouwsel"
-   — Voor vul_in / goed_fout / vermenigvuldig_tabel / getallenlijn: gebruik altijd **"Manipulatieopdracht"** als type-veld voor getallenlijn, **"Invulvraag"** voor de rest
+   — Voor vul_in / goed_fout / vermenigvuldig_tabel / getallenlijn / geld_tellen: gebruik altijd **"Manipulatieopdracht"** als type-veld voor getallenlijn, **"Invulvraag"** voor de rest
 4. **confidence**: Getal 0-100 (hoe zeker ben je van de classificatie)
 5. **difficulty**: "Makkelijk", "Gemiddeld", of "Moeilijk"
 6. **topic**: Onderwerp en subonderwerp (bijv. "Rekenen – Getallenlijn tot 20")
@@ -31,6 +32,97 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 9. **question_type**: Kies uit de tabel hierboven
 10. **rekensom_data**: Structuurdata voor interactieve weergave — zie per type hieronder. Null voor "standaard" en "blokken_bouwsel".
 11. **variants**: Twee varianten (Makkelijker / Moeilijker), elk met **level**, **text**, en **rekensom_data**
+
+---
+
+## geld_tellen specificaties
+
+### Wanneer gebruiken
+Gebruik **"geld_tellen"** als je op de afbeelding of in de tekst één of meer van het volgende ziet:
+- Euro-briefjes (€5, €10, €20, €50, €100, €200, €500) die geteld moeten worden
+- Euro-munten (1ct, 2ct, 5ct, 10ct, 20ct, 50ct, €1, €2) die geteld moeten worden
+- Een combinatie van briefjes en munten met de vraag "Hoeveel is dit?"
+- Een prijs + betaald geld waarbij de leerling het wisselgeld moet berekenen
+
+### rekensom_data structuur voor "geld_tellen":
+{
+  "modus": "tellen",
+  "items": [
+    { "soort": "briefje", "waarde": 10, "aantal": 1 },
+    { "soort": "munt",    "waarde": 2,   "aantal": 3 },
+    { "soort": "munt",    "waarde": 0.50, "aantal": 2 }
+  ],
+  "totaal": 17.00,
+  "prijs": null
+}
+
+### modus "wisselgeld" (leerling berekent het teruggegeven geld):
+{
+  "modus": "wisselgeld",
+  "items": [
+    { "soort": "briefje", "waarde": 20, "aantal": 1 }
+  ],
+  "prijs": 13.40,
+  "totaal": 6.60
+}
+
+### Regels voor geld_tellen
+
+**Algemeen:**
+- "soort": altijd "briefje" of "munt"
+- Geldige briefjewaarden: 5, 10, 20, 50, 100, 200, 500
+- Geldige muntwaarden: 0.01, 0.02, 0.05, 0.10, 0.20, 0.50, 1, 2
+- "aantal": altijd een positief geheel getal (minimum 1)
+- **"totaal": ALTIJD het antwoord dat de leerling moet invoeren**
+  → Modus "tellen": totaal = som van alle items (bijv. 1×€10 + 3×€2 + 2×€0,50 = 17,00)
+  → Modus "wisselgeld": totaal = betaald − prijs (bijv. €20 − €13,40 = €6,60)
+- Bereken totaal ALTIJD zelf — nooit gokken
+- Gebruik decimalen met een punt, geen komma (bijv. 0.50 niet 0,50)
+
+**Visuele herkenning (BELANGRIJK):**
+- Lees de afbeelding zorgvuldig: tel elk afgebeelde briefje en munt
+- Als een briefje of munt meerdere keren getoond wordt, tel het dan als meerdere items
+- Gebruik de getallen/bedragen die duidelijk op de afbeelding staan
+- Als de tekst "€" of "cent" aangeeft, neem die waarden over
+
+**Varianten voor geld_tellen:**
+- Makkelijker: alleen hele euro's (geen centen), max 3 items, kleine bedragen (bijv. €1-€10)
+- Moeilijker: combinatie briefjes én munten met centen, meer items, grotere bedragen
+- Beide varianten hebben hun eigen rekensom_data met passende items en correct berekend totaal
+
+**Voorbeeld makkelijkere variant:**
+{
+  "level": "Makkelijker",
+  "text": "Hoeveel euro is dit in totaal? Tip: tel de briefjes en munten apart.",
+  "rekensom_data": {
+    "modus": "tellen",
+    "items": [
+      { "soort": "munt", "waarde": 2, "aantal": 3 },
+      { "soort": "munt", "waarde": 1, "aantal": 2 }
+    ],
+    "totaal": 8.00,
+    "prijs": null
+  }
+}
+
+**Voorbeeld moeilijkere variant:**
+{
+  "level": "Moeilijker",
+  "text": "Bereken het totaalbedrag.",
+  "rekensom_data": {
+    "modus": "tellen",
+    "items": [
+      { "soort": "briefje", "waarde": 10, "aantal": 1 },
+      { "soort": "munt",    "waarde": 2,   "aantal": 2 },
+      { "soort": "munt",    "waarde": 0.50, "aantal": 3 },
+      { "soort": "munt",    "waarde": 0.20, "aantal": 2 }
+    ],
+    "totaal": 16.40,
+    "prijs": null
+  }
+}
+
+---
 
 ---
 
@@ -129,6 +221,7 @@ Regels voor getallenlijn:
 - Controleer zelf: lijn_min < alle te_plaatsen < lijn_max
 
 ### Voor "standaard" en "blokken_bouwsel": gebruik "rekensom_data": null
+### Voor "geld_tellen": zie de geld_tellen-sectie hierboven voor het volledige schema
 
 ---
 
@@ -196,11 +289,15 @@ Voorbeeld variantstructuur voor vul_in:
 2. Sommen waarbij de leerling Goed of Fout moet kiezen → question_type "goed_fout"
 3. Tabel met een vaste factor (bijv. × 5) en meerdere getallen met invulvakjes → question_type "vermenigvuldig_tabel"
 4. Een horizontale lijn met getallen en lege vakjes/pijltjes → question_type "getallenlijn"
-5. Als een pagina ALLEEN rekensommen bevat → groepeer sommen per thema, max 3 oefeningen per pagina
+5. Briefjes/munten op afbeelding of tekst met "euro", "cent", "betalen", "wisselgeld", "hoeveel" → question_type "geld_tellen"
+   → Lees de afbeelding: welke briefjes en munten zie je? Hoeveel van elk?
+   → Modus "tellen" als de leerling het totaal berekent; "wisselgeld" als er ook een prijs is
+   → Bereken totaal altijd zelf, gebruik decimale punt (niet komma)
+6. Als een pagina ALLEEN rekensommen bevat → groepeer sommen per thema, max 3 oefeningen per pagina
    → Optellen EN aftrekken op dezelfde pagina = één gecombineerde oefening (NIET splitsen)
    → Vermenigvuldigen en delen mogen wél apart als ze qua moeilijkheidsgraad duidelijk verschillen
-6. Als een som al een uitkomst toont én de leerling die moet beoordelen → altijd "goed_fout", NOOIT "vul_in"
-7. Als je twijfelt tussen vul_in en standaard: kies vul_in als er een getal ingevuld moet worden
+7. Als een som al een uitkomst toont én de leerling die moet beoordelen → altijd "goed_fout", NOOIT "vul_in"
+8. Als je twijfelt tussen vul_in en standaard: kies vul_in als er een getal ingevuld moet worden
 
 ---
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { C } from '@/lib/colors';
 import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import { GetallenLijnInteractief } from '@/components/getallenlijn';
+import { GeldTellenInteractief } from '@/components/geld-tellen';
 import SubmissionHistory from '@/components/SubmissionHistory';
 import { getProgress, recordAttempt } from '@/lib/progress';
 import { generateFreshRekensomData, THEMA_EMOJIS, parseSomNums } from '@/lib/math-generator';
@@ -32,6 +33,7 @@ const VAARDIGHEID_MAP = {
   'goed_fout':            'Je controleert of de rekensom klopt en kiest Goed of Fout.',
   'vermenigvuldig_tabel': 'Je vult de ontbrekende uitkomsten in de tabel in.',
   'getallenlijn':         'Je plaatst de getallen op de juiste plek op de getallenlijn.',
+  'geld_tellen':          'Je telt euro-briefjes en munten op en berekent het totaalbedrag.',
   // Blokkenbouwsel per interactietype
   'blokken_meerkeuze':    'Je herkent welk 3D-bouwsel bij de plattegrond hoort.',
   'blokken_tellen':       'Je telt hoeveel blokjes er in het bouwsel zitten.',
@@ -114,7 +116,7 @@ export default function ExercisePage({ exercise }) {
   const hasVariants = !!(easyVariant && hardVariant);
 
   // Math question type detection
-  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn'];
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen'];
   const isMathType = MATH_TYPES.includes(exercise.question_type);
   const activeRekensomData = isMathType
     ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
@@ -142,13 +144,10 @@ export default function ExercisePage({ exercise }) {
   const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
   const maxH = exercise.block_max_height || 5;
 
-  // Bij laden: haal opgeslagen studentniveau op
+  // Bij laden: haal opgeslagen studentniveau op (fase start altijd op 'easy')
   useEffect(() => {
     const p = getProgress('student');
     setStreak(p);
-    if (p.level === 'hard' && hasVariants) {
-      setPhase('hard');
-    }
   }, [hasVariants]);
 
   // Genereer verse rekensommen bij fase-start (5 willekeurige vragen per poging)
@@ -194,6 +193,17 @@ export default function ExercisePage({ exercise }) {
         if (exercise.question_type === 'getallenlijn') {
           const positions = displayRekensomData.te_plaatsen || [];
           return positions.length > 0 && positions.every(pos => Number(mathAnswers[pos]) === pos);
+        }
+        if (exercise.question_type === 'geld_tellen') {
+          const rekData = displayRekensomData ?? exercise.rekensom_data;
+          const gvt = rekData?.geld_vraag_type || 'invul';
+          if (gvt === 'meerkeuze')
+            return parseInt(mathAnswers[0]) === rekData?.correct_optie;
+          if (gvt === 'goed_fout')
+            return (mathAnswers[0] === 'Goed') === rekData?.klopt;
+          const inputVal = String(mathAnswers[0] || '').replace(',', '.').trim();
+          const studentAmount = parseFloat(inputVal);
+          return !isNaN(studentAmount) && rekData?.totaal != null && Math.abs(studentAmount - rekData.totaal) < 0.005;
         }
         return false;
       })()
@@ -333,6 +343,9 @@ export default function ExercisePage({ exercise }) {
           const positions = displayRekensomData.te_plaatsen || [];
           return positions.length > 0 && positions.every(pos => mathAnswers[pos] !== undefined);
         }
+        if (exercise.question_type === 'geld_tellen') {
+          return mathAnswers[0] !== undefined && String(mathAnswers[0]).trim() !== '';
+        }
         return false;
       })()
     : false;
@@ -386,7 +399,7 @@ export default function ExercisePage({ exercise }) {
                 {submitted && isRight && (
                   <span style={{ fontSize: 16, color: C.green, marginLeft: 6 }}>✓</span>
                 )}
-                {!submitted && <EmojiHint som={som} emoji={emoji} />}
+                {!submitted && attempts > 0 && <EmojiHint som={som} emoji={emoji} />}
               </div>
             );
           })}
@@ -527,6 +540,23 @@ export default function ExercisePage({ exercise }) {
           onPlacementsChange={(placements) => setMathAnswers(placements)}
         />
       );
+    }
+
+    // ── Geld tellen: euro briefjes en munten ──
+    if (exercise.question_type === 'geld_tellen') {
+      const geldData = displayRekensomData ?? exercise.rekensom_data;
+      if (geldData?.items) {
+        return (
+          <GeldTellenInteractief
+            key={`gt-${phase}-${inputKey}`}
+            data={geldData}
+            submitted={submitted}
+            value={mathAnswers[0] ?? ''}
+            onAnswerChange={(val) => setMathAnswers(prev => ({ ...prev, 0: val }))}
+            isCorrect={submitted ? mathIsCorrect : null}
+          />
+        );
+      }
     }
 
     if (isBlockQuestion && isTellenMode) {

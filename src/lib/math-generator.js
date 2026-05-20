@@ -128,8 +128,8 @@ function freshVulIn(data, count) {
     [result[i], result[j]] = [result[j], result[i]];
   }
 
-  // Only use thema if AI provided it — no random fallback
-  return result.length >= count ? { ...data, sommen: result } : data;
+  const thema = data.thema || randomThema();
+  return result.length >= count ? { ...data, thema, sommen: result } : { ...data, thema };
 }
 
 const OP_SYM = { vermenigvuldigen: '×', optellen: '+', aftrekken: '−', delen: '÷' };
@@ -248,6 +248,90 @@ function freshGetallenLijn(data) {
   return { ...data, te_plaatsen };
 }
 
+// Geen 1ct/2ct (moeilijk wisselgeld) en geen €200/€500 (onrealistisch in schoolcontext)
+const BRIEFJE_POOL = [5, 10, 20, 50, 100];
+const MUNT_POOL    = [0.05, 0.10, 0.20, 0.50, 1, 2];
+// Prijzen altijd veelvoud van 5ct → wisselgeld vereist nooit 1ct/2ct
+const CENT_OPTIONS = [0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95];
+
+function generateDisstractors(correct, count = 3) {
+  const seen = new Set([correct]);
+  const result = [];
+  const offsets = [5, 10, 15, 20, 25, 50, 100]; // in centen
+  let attempts = 100;
+  while (result.length < count && attempts-- > 0) {
+    const cents = offsets[rand(0, offsets.length - 1)];
+    const sign = Math.random() > 0.5 ? 1 : -1;
+    const candidate = Math.round((correct + sign * cents / 100) * 100) / 100;
+    if (candidate > 0 && !seen.has(candidate)) {
+      seen.add(candidate);
+      result.push(candidate);
+    }
+  }
+  return result;
+}
+
+function buildGeldBase(data) {
+  const modus = Math.random() > 0.5 ? 'wisselgeld' : 'tellen';
+
+  if (modus === 'wisselgeld') {
+    const betaaldWaarde = BRIEFJE_POOL[rand(0, BRIEFJE_POOL.length - 1)];
+    const centen        = CENT_OPTIONS[rand(0, CENT_OPTIONS.length - 1)];
+    const euroPart      = rand(1, Math.max(1, betaaldWaarde - 2));
+    const prijs         = Math.round((euroPart + centen) * 100) / 100;
+    const safePrijs     = prijs >= betaaldWaarde ? betaaldWaarde - 0.05 : prijs;
+    const totaal        = Math.round((betaaldWaarde - safePrijs) * 100) / 100;
+    return { ...data, modus: 'wisselgeld', items: [{ soort: 'briefje', waarde: betaaldWaarde, aantal: 1 }], prijs: safePrijs, totaal };
+  }
+
+  const numItems = rand(2, 4);
+  const items    = [];
+  const seen     = new Set();
+  let attempts   = 60;
+  while (items.length < numItems && attempts-- > 0) {
+    const isBriefje = Math.random() > 0.5;
+    const pool      = isBriefje ? BRIEFJE_POOL : MUNT_POOL;
+    const waarde    = pool[rand(0, pool.length - 1)];
+    const key       = `${isBriefje ? 'b' : 'm'}-${waarde}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({ soort: isBriefje ? 'briefje' : 'munt', waarde, aantal: rand(1, 3) });
+  }
+  if (!items.length) return data;
+  const totaal = Math.round(items.reduce((s, it) => s + it.waarde * it.aantal, 0) * 100) / 100;
+  return { ...data, modus: 'tellen', items, totaal, prijs: undefined };
+}
+
+function freshGeldTellen(data) {
+  const base = buildGeldBase(data);
+  const types = ['invul', 'meerkeuze', 'goed_fout'];
+  const geld_vraag_type = types[rand(0, types.length - 1)];
+
+  if (geld_vraag_type === 'meerkeuze') {
+    const distractors = generateDisstractors(base.totaal);
+    const opties = [base.totaal, ...distractors].sort(() => Math.random() - 0.5);
+    return { ...base, geld_vraag_type: 'meerkeuze', opties, correct_optie: opties.indexOf(base.totaal) };
+  }
+
+  if (geld_vraag_type === 'goed_fout') {
+    const klopt = Math.random() > 0.5;
+    let getoond_bedrag = base.totaal;
+    if (!klopt) {
+      const offsets = [5, 10, 20, 25, 50];
+      let attempts = 20;
+      while (attempts-- > 0) {
+        const cents = offsets[rand(0, offsets.length - 1)];
+        const sign  = Math.random() > 0.5 ? 1 : -1;
+        const c = Math.round((base.totaal + sign * cents / 100) * 100) / 100;
+        if (c > 0 && c !== base.totaal) { getoond_bedrag = c; break; }
+      }
+    }
+    return { ...base, geld_vraag_type: 'goed_fout', getoond_bedrag, klopt };
+  }
+
+  return { ...base, geld_vraag_type: 'invul' };
+}
+
 export function generateFreshRekensomData(rekensomData, questionType, count = 5) {
   if (!rekensomData) return null;
   try {
@@ -255,6 +339,7 @@ export function generateFreshRekensomData(rekensomData, questionType, count = 5)
     if (questionType === 'goed_fout') return freshGoedFout(rekensomData, count);
     if (questionType === 'vermenigvuldig_tabel') return freshTabel(rekensomData, count);
     if (questionType === 'getallenlijn') return freshGetallenLijn(rekensomData);
+    if (questionType === 'geld_tellen') return freshGeldTellen(rekensomData);
   } catch (e) {
     console.warn('math-generator fallback:', e);
   }
