@@ -623,84 +623,93 @@ function BlockBuilder({ planGrid, maxHeight, onAnswered, disabled }) {
         })}
       </div>
 
-      {/* Isometric canvas */}
-      <div style={{
-        background: '#FAF6FD', border: `2px solid ${C.border}`,
-        borderRadius: 14, overflow: 'hidden',
-        boxShadow: '0 2px 12px rgba(109,32,119,0.08)',
-      }}>
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
-          style={{ display: 'block', width: '100%', cursor: disabled ? 'default' : 'pointer' }}
-        />
+      {/* Two-column: canvas left, info right */}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+
+        {/* Isometric canvas */}
         <div style={{
-          padding: '6px 14px 10px',
-          fontSize: 12, color: C.textMid, fontStyle: 'italic',
-          borderTop: `1px solid ${C.border}`, background: C.bg,
-          minHeight: 32, display: 'flex', alignItems: 'center',
+          flex: '1 1 0', minWidth: 0,
+          background: '#FAF6FD', border: `2px solid ${C.border}`,
+          borderRadius: 14, overflow: 'hidden',
+          boxShadow: '0 2px 12px rgba(109,32,119,0.08)',
         }}>
-          {hint}
-          {!disabled && (
-            <span style={{ marginLeft: 'auto', color: C.textLight, fontSize: 11 }}>
-              Rechtsklik = weghalen
-            </span>
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_W}
+            height={CANVAS_H}
+            style={{ display: 'block', width: '100%', cursor: disabled ? 'default' : 'pointer' }}
+          />
+          <div style={{
+            padding: '6px 14px 10px',
+            fontSize: 12, color: C.textMid, fontStyle: 'italic',
+            borderTop: `1px solid ${C.border}`, background: C.bg,
+            minHeight: 32, display: 'flex', alignItems: 'center',
+          }}>
+            {hint}
+            {!disabled && (
+              <span style={{ marginLeft: 'auto', color: C.textLight, fontSize: 11 }}>
+                Rechtsklik = weghalen
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right column: progress + floor plan + feedback */}
+        <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Progress bar */}
+          <div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: 13, fontWeight: 700, color: C.textMid, marginBottom: 6,
+            }}>
+              <span>Voortgang</span>
+              <span style={{
+                background: correctCells === totalCells ? C.greenLight : C.purpleLight,
+                color: correctCells === totalCells ? C.green : C.purple,
+                padding: '2px 8px', borderRadius: 20, fontSize: 11,
+              }}>
+                {correctCells}/{totalCells}
+              </span>
+            </div>
+            <div style={{ height: 10, background: C.border, borderRadius: 5, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${(correctCells / totalCells) * 100}%`,
+                background: correctCells === totalCells
+                  ? C.green
+                  : `linear-gradient(90deg, ${C.purple}, ${C.pink})`,
+                borderRadius: 5,
+                transition: 'width 0.35s ease',
+              }} />
+            </div>
+          </div>
+
+          {/* Floor plan with live per-cell coloring */}
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 10 }}>
+              Plattegrond — dit is jouw doel
+            </div>
+            <FloorPlanFeedback planGrid={planGrid} builtGrid={builtGrid} showFeedback={disabled} />
+          </div>
+
+          {/* Post-submit feedback */}
+          {disabled && (
+            <div style={{
+              fontSize: 13, fontWeight: 800,
+              color: isCorrect ? C.green : C.red,
+              background: isCorrect ? C.greenLight : C.redLight,
+              border: `2px solid ${isCorrect ? C.green : C.red}`,
+              borderRadius: 10, padding: '12px 14px',
+              textAlign: 'center',
+            }}>
+              {isCorrect
+                ? '✓ Perfect! Jouw bouwsel past precies bij de plattegrond.'
+                : '✗ Nog niet helemaal goed. Vergelijk jouw getallen met de plattegrond.'}
+            </div>
           )}
         </div>
       </div>
-
-      {/* Progress bar */}
-      <div>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          fontSize: 13, fontWeight: 700, color: C.textMid, marginBottom: 6,
-        }}>
-          <span>Voortgang</span>
-          <span style={{
-            background: correctCells === totalCells ? C.greenLight : C.purpleLight,
-            color: correctCells === totalCells ? C.green : C.purple,
-            padding: '2px 10px', borderRadius: 20, fontSize: 12,
-          }}>
-            {correctCells} / {totalCells} vakjes goed
-          </span>
-        </div>
-        <div style={{ height: 10, background: C.border, borderRadius: 5, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%',
-            width: `${(correctCells / totalCells) * 100}%`,
-            background: correctCells === totalCells
-              ? C.green
-              : `linear-gradient(90deg, ${C.purple}, ${C.pink})`,
-            borderRadius: 5,
-            transition: 'width 0.35s ease',
-          }} />
-        </div>
-      </div>
-
-      {/* Floor plan with live per-cell coloring */}
-      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: C.textMid, marginBottom: 10 }}>
-          Plattegrond — dit is jouw doel
-        </div>
-        <FloorPlanFeedback planGrid={planGrid} builtGrid={builtGrid} showFeedback={disabled} />
-      </div>
-
-      {/* Post-submit feedback */}
-      {disabled && (
-        <div style={{
-          fontSize: 14, fontWeight: 800,
-          color: isCorrect ? C.green : C.red,
-          background: isCorrect ? C.greenLight : C.redLight,
-          border: `2px solid ${isCorrect ? C.green : C.red}`,
-          borderRadius: 10, padding: '12px 16px',
-          textAlign: 'center',
-        }}>
-          {isCorrect
-            ? '✓ Perfect! Jouw bouwsel past precies bij de plattegrond.'
-            : '✗ Nog niet helemaal goed. Vergelijk jouw getallen met de plattegrond.'}
-        </div>
-      )}
     </div>
   );
 }
