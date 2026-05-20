@@ -38,16 +38,34 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 
 ### "vul_in" — sommen met lege vakjes:
 {
+  "thema": "appel",
+  "bereik_min": 1,
+  "bereik_max": 10,
   "sommen": [
-    { "tekst": "3 × 4 = ___", "antwoord": 12, "bewerking": "vermenigvuldigen" },
-    { "tekst": "___ + 5 = 12", "antwoord": 7, "bewerking": "optellen" },
-    { "tekst": "15 − ___ = 8", "antwoord": 7, "bewerking": "aftrekken" }
+    { "tekst": "3 + 4 = ___", "antwoord": 7, "bewerking": "optellen" },
+    { "tekst": "8 − 3 = ___", "antwoord": 5, "bewerking": "aftrekken" }
   ]
 }
 
+Regels voor bereik (VERPLICHT voor elke vul_in oefening én elke variant):
+- "bereik_min": altijd 1 (of hoger voor gevorderde oefeningen)
+- "bereik_max": het MAXIMALE getal dat in deze oefening mag voorkomen
+  → Optellen tot 10: bereik_max = 10
+  → Aftrekken uit 20: bereik_max = 20
+  → Tafels van 5 tot 50: bereik_max = 50
+  → bereik_max bepaalt de moeilijkheidsgraad — stel dit ALTIJD correct in
+
+Regels voor thema (VERPLICHT als bereik_max ≤ 20):
+- Kies een kindvriendelijk concreet voorwerp: "appel", "peer", "banaan", "aardbei", "ei", "blad", "bloem", "ster", "bal", "vis", "vlinder", "kikker"
+- Kies iets passend bij de context of het seizoen
+- Gebruik hetzelfde thema voor alle sommen in één oefening én in de bijbehorende varianten
+- Zet thema op null alleen als bereik_max > 20 of bij vermenigvuldig-/deelsommen
+
 Regels voor vul_in:
-- Groepeer soortgelijke rijtjessommen als één oefening (max 6 sommen per oefening)
-- "bewerking": "optellen" | "aftrekken" | "vermenigvuldigen" | "delen"
+- Groepeer ALLE sommen van hetzelfde rekenthema als één oefening (max 6 sommen per oefening)
+- Als een pagina ZOWEL optellen als aftrekken bevat: voeg BEIDE types samen in één oefening — zet optellen én aftrekken sommen in dezelfde "sommen"-array
+- Maak GEEN aparte exercises voor optellen en voor aftrekken als ze samen op één pagina staan
+- "bewerking": "optellen" | "aftrekken" | "vermenigvuldigen" | "delen" — gebruik ALTIJD de bewerking die in de som staat, verander nooit aftrekken naar optellen
 - "antwoord": het EXACTE correcte getal — bereken dit altijd zelf, nooit gokken
 - "tekst": gebruik ___ als plaatshouder voor het lege vakje; de leerling vult dit in
 - Als het lege vakje vóór de = staat: "___ + 5 = 12" → antwoord = 7
@@ -98,23 +116,26 @@ Regels voor vermenigvuldig_tabel:
 
 Regels voor getallenlijn:
 - "lijn_min" / "lijn_max": begin en eindpunt van de getallenlijn (gehele getallen)
-- "stap": afstand tussen opeenvolgende streepjes op de lijn (bijv. 2 = streepjes bij 0,2,4,6,...)
-- "te_plaatsen": de getallen die de leerling moet plaatsen (ALTIJD gehele getallen die EXACT op de streepjes vallen)
-- "gegeven_getallen": getallen die al op de lijn staan als ankerpunten (helpen de leerling oriënteren)
-- Elk getal in "te_plaatsen" MOET een veelvoud zijn van "stap" minus "lijn_min"
-  → Voorbeeld: lijn_min=0, stap=2 → te_plaatsen mag alleen even getallen bevatten (0,2,4,6,...)
+- "stap": afstand tussen opeenvolgende streepjes (bijv. stap=2 → streepjes op 0, 2, 4, 6, …)
+- "te_plaatsen": getallen die de leerling moet plaatsen — ALTIJD exact op een streepje
+  → Elk getal = lijn_min + k × stap, waarbij k een geheel getal ≥ 1 is (niet het eindpunt zelf)
+  → Voorbeeld: lijn_min=0, stap=5, lijn_max=50 → geldig: 5, 10, 15, 20, 25, 30, 35, 40, 45
+  → Voorbeeld: lijn_min=10, stap=2, lijn_max=20 → geldig: 12, 14, 16, 18
+  → NOOIT een getal dat niet op een streepje valt
+- "gegeven_getallen": zichtbare ankerpunten op de lijn — bevat ALTIJD lijn_min en lijn_max plus 1-2 tussenpunten (bijv. het midden) zodat de leerling zich kan oriënteren
 - "te_plaatsen" en "gegeven_getallen" mogen GEEN gemeenschappelijke getallen bevatten
-- "te_plaatsen" bevat 2-5 getallen; "gegeven_getallen" bevat 2-4 ankers
-- Controleer: lijn_min ≤ alle te_plaatsen ≤ lijn_max
+- "te_plaatsen" bevat 2-5 getallen, goed verspreid over de lijn (niet allemaal aan één kant)
+- "gegeven_getallen" bevat 2-4 ankerpunten
+- Controleer zelf: lijn_min < alle te_plaatsen < lijn_max
 
 ### Voor "standaard" en "blokken_bouwsel": gebruik "rekensom_data": null
 
 ---
 
 ## Getallenlijn-varianten
-Elke variant heeft zijn eigen rekensom_data:
-- **Makkelijker**: kleiner bereik (bijv. 0–10 of 0–20), stap=1 of stap=2, slechts 2 getallen plaatsen, veel ankerpunten
-- **Moeilijker**: groter bereik (bijv. 0–100 of 0–1000), grotere stap, 4–5 getallen plaatsen, minder ankerpunten
+Elke variant heeft zijn eigen rekensom_data — controleer bij ELKE variant opnieuw dat alle te_plaatsen geldig zijn (= lijn_min + k × stap):
+- **Makkelijker**: kleiner bereik (bijv. 0–10 of 0–20), stap=1 of stap=2, slechts 2 getallen plaatsen, veel ankerpunten (incl. midden)
+- **Moeilijker**: groter bereik (bijv. 0–100 of 0–1000), grotere stap, 4–5 getallen plaatsen goed verspreid, minder ankerpunten
 
 Richtlijn voor getallenlijn-tekst:
 - Makkelijker: "Zet de getallen op de juiste plek op de getallenlijn. Kijk naar de ankerpunten!"
@@ -158,9 +179,12 @@ Voorbeeld variantstructuur voor vul_in:
   "level": "Makkelijker",
   "text": "Vul de uitkomst in. Tip: tel op je vingers mee!",
   "rekensom_data": {
+    "thema": "appel",
+    "bereik_min": 1,
+    "bereik_max": 10,
     "sommen": [
-      { "tekst": "2 × 3 = ___", "antwoord": 6, "bewerking": "vermenigvuldigen" },
-      { "tekst": "1 × 5 = ___", "antwoord": 5, "bewerking": "vermenigvuldigen" }
+      { "tekst": "3 + 4 = ___", "antwoord": 7, "bewerking": "optellen" },
+      { "tekst": "6 − 2 = ___", "antwoord": 4, "bewerking": "aftrekken" }
     ]
   }
 }
@@ -172,7 +196,9 @@ Voorbeeld variantstructuur voor vul_in:
 2. Sommen waarbij de leerling Goed of Fout moet kiezen → question_type "goed_fout"
 3. Tabel met een vaste factor (bijv. × 5) en meerdere getallen met invulvakjes → question_type "vermenigvuldig_tabel"
 4. Een horizontale lijn met getallen en lege vakjes/pijltjes → question_type "getallenlijn"
-5. Als een pagina ALLEEN rekensommen bevat → groepeer soortgelijke sommen, max 3 oefeningen per pagina
+5. Als een pagina ALLEEN rekensommen bevat → groepeer sommen per thema, max 3 oefeningen per pagina
+   → Optellen EN aftrekken op dezelfde pagina = één gecombineerde oefening (NIET splitsen)
+   → Vermenigvuldigen en delen mogen wél apart als ze qua moeilijkheidsgraad duidelijk verschillen
 6. Als een som al een uitkomst toont én de leerling die moet beoordelen → altijd "goed_fout", NOOIT "vul_in"
 7. Als je twijfelt tussen vul_in en standaard: kies vul_in als er een getal ingevuld moet worden
 

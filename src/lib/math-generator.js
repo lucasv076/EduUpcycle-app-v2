@@ -1,5 +1,32 @@
 // Client-side math question generator — produces fresh questions per attempt
 
+export const THEMA_EMOJIS = {
+  appel:    '🍎',
+  peer:     '🍐',
+  banaan:   '🍌',
+  aardbei:  '🍓',
+  ei:       '🥚',
+  blad:     '🍃',
+  bloem:    '🌸',
+  ster:     '⭐',
+  bal:      '⚽',
+  vis:      '🐟',
+  vlinder:  '🦋',
+  kikker:   '🐸',
+};
+const THEMA_KEYS = Object.keys(THEMA_EMOJIS);
+
+export function randomThema() {
+  return THEMA_KEYS[Math.floor(Math.random() * THEMA_KEYS.length)];
+}
+
+// Parses "a OP b = ___" → { a, op, b } or null
+export function parseSomNums(tekst) {
+  const m = tekst.match(/^(\d+)\s*([+\-−])\s*(\d+)\s*=\s*___/);
+  if (!m) return null;
+  return { a: parseInt(m[1]), op: m[2], b: parseInt(m[3]) };
+}
+
 function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -14,27 +41,42 @@ function rangeFromSommen(sommen) {
   return { lo: Math.max(1, Math.min(...nums)), hi: Math.max(...nums) };
 }
 
-function makeSom(bewerking, lo, hi) {
+// bereikMax = highest number allowed in the som (set by AI, e.g. 10 for "tot 10")
+function makeSom(bewerking, lo, bereikMax) {
   let a, b, antwoord, tekst;
   switch (bewerking) {
-    case 'vermenigvuldigen':
-      a = rand(lo, hi); b = rand(lo, hi);
+    case 'vermenigvuldigen': {
+      const half = Math.max(lo, Math.floor(Math.sqrt(bereikMax)));
+      a = rand(lo, half); b = rand(lo, half);
       antwoord = a * b; tekst = `${a} × ${b} = ___`;
       break;
-    case 'optellen':
-      a = rand(lo, hi); b = rand(lo, hi);
+    }
+    case 'optellen': {
+      // Both a and b ≥ lo, a + b ≤ bereikMax
+      const maxA = bereikMax - lo;
+      if (maxA < lo) return null;
+      a = rand(lo, maxA);
+      const maxB = bereikMax - a;
+      if (maxB < lo) return null;
+      b = rand(lo, maxB);
       antwoord = a + b; tekst = `${a} + ${b} = ___`;
       break;
-    case 'aftrekken':
-      b = rand(lo, hi); a = b + rand(lo, hi);
+    }
+    case 'aftrekken': {
+      // a ≤ bereikMax, b ≥ 1, answer = a - b ≥ lo
+      if (bereikMax <= lo) return null;
+      a = rand(lo + 1, bereikMax);
+      b = rand(1, a - lo);   // ensures answer = a - b ≥ lo
       antwoord = a - b; tekst = `${a} − ${b} = ___`;
       break;
-    case 'delen':
-      b = rand(Math.max(2, lo), Math.max(2, hi));
-      antwoord = rand(lo, hi);
+    }
+    case 'delen': {
+      b = rand(2, Math.max(2, Math.floor(Math.sqrt(bereikMax))));
+      antwoord = rand(lo, Math.floor(bereikMax / b));
       a = antwoord * b;
       tekst = `${a} ÷ ${b} = ___`;
       break;
+    }
     default:
       return null;
   }
@@ -47,23 +89,46 @@ function freshVulIn(data, count) {
 
   const freq = {};
   sommen.forEach(s => { freq[s.bewerking] = (freq[s.bewerking] || 0) + 1; });
-  const bewerking = Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0];
+  const bewerkingen = Object.keys(freq);
 
-  const { lo, hi } = rangeFromSommen(sommen);
-  const safeHi = Math.max(lo + 2, hi);
+  // Use AI-provided range; fall back to derived range only if not set
+  const derived = rangeFromSommen(sommen);
+  const lo = data.bereik_min != null ? data.bereik_min : Math.max(1, derived.lo);
+  const bereikMax = data.bereik_max != null ? data.bereik_max : Math.max(lo + 4, derived.hi);
+
+  // Distribute count proportionally across all bewerkingen (preserves optellen+aftrekken mix)
+  const total = sommen.length;
+  const planned = {};
+  bewerkingen.forEach(b => { planned[b] = Math.max(1, Math.round((freq[b] / total) * count)); });
+  const plannedTotal = Object.values(planned).reduce((a, b) => a + b, 0);
+  if (plannedTotal !== count) {
+    const topB = [...bewerkingen].sort((a, b) => freq[b] - freq[a])[0];
+    planned[topB] += count - plannedTotal;
+  }
 
   const result = [];
   const seen = new Set();
-  let attempts = count * 40;
 
-  while (result.length < count && attempts-- > 0) {
-    const s = makeSom(bewerking, lo, safeHi);
-    if (s && !seen.has(s.tekst)) {
-      seen.add(s.tekst);
-      result.push(s);
+  for (const bewerking of bewerkingen) {
+    let remaining = planned[bewerking];
+    let attempts = remaining * 40;
+    while (remaining > 0 && attempts-- > 0) {
+      const s = makeSom(bewerking, lo, bereikMax);
+      if (s && !seen.has(s.tekst)) {
+        seen.add(s.tekst);
+        result.push(s);
+        remaining--;
+      }
     }
   }
 
+  // Shuffle so bewerkingen are interleaved
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+
+  // Only use thema if AI provided it — no random fallback
   return result.length >= count ? { ...data, sommen: result } : data;
 }
 
@@ -157,12 +222,39 @@ function freshTabel(data, count) {
   return { ...data, rijen: newRijen };
 }
 
+function freshGetallenLijn(data) {
+  const { lijn_min = 0, lijn_max = 20, stap = 1, te_plaatsen: orig = [], gegeven_getallen = [] } = data;
+  const stepSize = Math.max(1, stap);
+
+  // All valid tick positions excluding endpoints and given anchors
+  const excluded = new Set([lijn_min, lijn_max, ...gegeven_getallen]);
+  const pool = [];
+  for (let p = lijn_min + stepSize; p < lijn_max; p += stepSize) {
+    if (!excluded.has(p)) pool.push(p);
+  }
+
+  if (pool.length === 0) return data;
+
+  // Keep same count as original (min 2, max pool size)
+  const count = Math.min(Math.max(2, orig.length), pool.length);
+
+  // Shuffle pool and take first `count` positions
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const te_plaatsen = pool.slice(0, count).sort((a, b) => a - b);
+
+  return { ...data, te_plaatsen };
+}
+
 export function generateFreshRekensomData(rekensomData, questionType, count = 5) {
   if (!rekensomData) return null;
   try {
     if (questionType === 'vul_in') return freshVulIn(rekensomData, count);
     if (questionType === 'goed_fout') return freshGoedFout(rekensomData, count);
     if (questionType === 'vermenigvuldig_tabel') return freshTabel(rekensomData, count);
+    if (questionType === 'getallenlijn') return freshGetallenLijn(rekensomData);
   } catch (e) {
     console.warn('math-generator fallback:', e);
   }

@@ -7,7 +7,7 @@ import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, cl
 import { GetallenLijnInteractief } from '@/components/getallenlijn';
 import SubmissionHistory from '@/components/SubmissionHistory';
 import { getProgress, recordAttempt } from '@/lib/progress';
-import { generateFreshRekensomData } from '@/lib/math-generator';
+import { generateFreshRekensomData, THEMA_EMOJIS, parseSomNums } from '@/lib/math-generator';
 
 // Generate or retrieve a stable session ID
 function getSessionId() {
@@ -62,6 +62,34 @@ const ZwijsenLogo = () => (
     ))}
   </div>
 );
+
+const MAX_VIZ = 12;
+
+function EmojiHint({ som, emoji }) {
+  if (!emoji) return null;
+  const parsed = parseSomNums(som.tekst);
+  if (!parsed || parsed.a > MAX_VIZ || parsed.b > MAX_VIZ) return null;
+  const { a, op, b } = parsed;
+  const isAdd = op === '+';
+  const isSub = op === '-' || op === '−';
+  if (!isAdd && !isSub) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2,
+      paddingLeft: 10, borderLeft: `2px solid #DDD0E6`, marginLeft: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+      {isAdd ? (
+        <>
+          {Array.from({ length: a }, (_, i) => <span key={`a${i}`} style={{ fontSize: 17, lineHeight: 1 }}>{emoji}</span>)}
+          <span style={{ fontSize: 12, color: '#9B89AC', fontWeight: 700, margin: '0 3px' }}>|</span>
+          {Array.from({ length: b }, (_, i) => <span key={`b${i}`} style={{ fontSize: 17, lineHeight: 1 }}>{emoji}</span>)}
+        </>
+      ) : (
+        Array.from({ length: a }, (_, i) => (
+          <span key={i} style={{ fontSize: 17, lineHeight: 1, opacity: i >= (a - b) ? 0.2 : 1 }}>{emoji}</span>
+        ))
+      )}
+    </div>
+  );
+}
 
 export default function ExercisePage({ exercise }) {
   const [phase, setPhase]         = useState('easy');
@@ -315,6 +343,7 @@ export default function ExercisePage({ exercise }) {
     // ── Vul in: rekensom met lege vakjes ──
     if (exercise.question_type === 'vul_in' && displayRekensomData?.sommen) {
       const sommen = displayRekensomData.sommen;
+      const emoji = THEMA_EMOJIS[displayRekensomData.thema] || null;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {sommen.map((som, i) => {
@@ -357,6 +386,7 @@ export default function ExercisePage({ exercise }) {
                 {submitted && isRight && (
                   <span style={{ fontSize: 16, color: C.green, marginLeft: 6 }}>✓</span>
                 )}
+                {!submitted && <EmojiHint som={som} emoji={emoji} />}
               </div>
             );
           })}

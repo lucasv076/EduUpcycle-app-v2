@@ -7,6 +7,7 @@ import { extractPdfPages, extractImageFile } from '@/lib/pdf-extract';
 import { ExerciseIllustration } from '@/components/illustrations';
 import { BlokkenBouwselInteractive, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import { GetallenLijnInteractief } from '@/components/getallenlijn';
+import { THEMA_EMOJIS, parseSomNums } from '@/lib/math-generator';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
 const Badge = ({ label, bg, color, small }) => (
@@ -44,6 +45,35 @@ const PROC = [
   'Oefeningen herkennen en vraagtypes detecteren',
   'Interactieve varianten genereren',
 ];
+
+// ── Emoji visual hint for vul_in ──────────────────────────────────────
+const MAX_VIZ = 12;
+
+function EmojiHint({ som, emoji }) {
+  if (!emoji) return null;
+  const parsed = parseSomNums(som.tekst);
+  if (!parsed || parsed.a > MAX_VIZ || parsed.b > MAX_VIZ) return null;
+  const { a, op, b } = parsed;
+  const isAdd = op === '+';
+  const isSub = op === '-' || op === '−';
+  if (!isAdd && !isSub) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2,
+      paddingLeft: 10, borderLeft: `2px solid ${C.border}`, marginLeft: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+      {isAdd ? (
+        <>
+          {Array.from({ length: a }, (_, i) => <span key={`a${i}`} style={{ fontSize: 17, lineHeight: 1 }}>{emoji}</span>)}
+          <span style={{ fontSize: 12, color: C.textLight, fontWeight: 700, margin: '0 3px' }}>|</span>
+          {Array.from({ length: b }, (_, i) => <span key={`b${i}`} style={{ fontSize: 17, lineHeight: 1 }}>{emoji}</span>)}
+        </>
+      ) : (
+        Array.from({ length: a }, (_, i) => (
+          <span key={i} style={{ fontSize: 17, lineHeight: 1, opacity: i >= (a - b) ? 0.2 : 1 }}>{emoji}</span>
+        ))
+      )}
+    </div>
+  );
+}
 
 // ── Student Preview Modal ─────────────────────────────────────────────
 function StudentPreview({ exercise, onClose }) {
@@ -94,26 +124,67 @@ function StudentPreview({ exercise, onClose }) {
   const handleNextLevel = () => { setAnswer(''); setMathAnswers({}); setSubmitted(false); setPhase('hard'); };
   const handleDone = () => setPhase('done');
 
+  const mathIsCorrect = submitted && isMathType && activeRekensomData
+    ? (() => {
+        if (exercise.question_type === 'vul_in') {
+          const sommen = activeRekensomData.sommen || [];
+          return sommen.length > 0 && sommen.every((s, i) => Number(mathAnswers[i]) === s.antwoord);
+        }
+        if (exercise.question_type === 'goed_fout') {
+          const stellingen = activeRekensomData.stellingen || [];
+          return stellingen.length > 0 && stellingen.every((s, i) => (mathAnswers[i] === 'Goed') === s.klopt);
+        }
+        if (exercise.question_type === 'vermenigvuldig_tabel') {
+          const blankRijen = (activeRekensomData.rijen || []).filter(r => r.uitkomst === null);
+          return blankRijen.length > 0 && blankRijen.every((r, i) => Number(mathAnswers[i]) === r.antwoord);
+        }
+        if (exercise.question_type === 'getallenlijn') {
+          const positions = activeRekensomData.te_plaatsen || [];
+          return positions.length > 0 && positions.every(pos => Number(mathAnswers[pos]) === pos);
+        }
+        return false;
+      })()
+    : null;
+
+  const isAnswerCorrect = submitted
+    ? isMathType
+      ? mathIsCorrect
+      : isTellenMode
+        ? Number(answer) === blockTotalCount
+        : isGoedFoutMode
+          ? answer === goedFoutCorrect
+          : isBlockQuestion
+            ? answer === exercise.block_correct_option
+            : true
+    : null;
+
   const renderInput = () => {
 
     // ── Vul in ──
     if (exercise.question_type === 'vul_in' && activeRekensomData?.sommen) {
+      const emoji = THEMA_EMOJIS[activeRekensomData.thema] || null;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {activeRekensomData.sommen.map((som, i) => {
             const parts = som.tekst.split('___');
+            const isRight = submitted ? Number(mathAnswers[i]) === som.antwoord : null;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8,
-                background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 14px' }}>
+                background: submitted ? (isRight ? C.greenLight : C.redLight) : C.bg,
+                border: `1.5px solid ${submitted ? (isRight ? C.green : C.red) : C.border}`,
+                borderRadius: 8, padding: '8px 14px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 700 }}>{parts[0]}</span>
                 <input type="number" value={mathAnswers[i] ?? ''} disabled={submitted}
                   onChange={e => setMathAnswers(p => ({ ...p, [i]: e.target.value }))}
                   placeholder="?" style={{ width: 64, fontSize: 18, fontWeight: 700, textAlign: 'center',
-                    border: `2px solid ${C.purple}`, borderRadius: 6, padding: '4px', fontFamily: 'monospace' }} />
+                    border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
+                    borderRadius: 6, padding: '4px', fontFamily: 'monospace',
+                    background: submitted ? 'transparent' : C.white }} />
                 {parts[1] && <span style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 700 }}>{parts[1]}</span>}
-                {submitted && <span style={{ fontSize: 12, color: Number(mathAnswers[i]) === som.antwoord ? C.green : C.red, fontWeight: 700 }}>
-                  {Number(mathAnswers[i]) === som.antwoord ? '✓' : `→ ${som.antwoord}`}
+                {submitted && <span style={{ fontSize: 12, color: isRight ? C.green : C.red, fontWeight: 700 }}>
+                  {isRight ? '✓' : `→ ${som.antwoord}`}
                 </span>}
+                {!submitted && <EmojiHint som={som} emoji={emoji} />}
               </div>
             );
           })}
@@ -424,13 +495,24 @@ function StudentPreview({ exercise, onClose }) {
                 </button>
               ) : (
                 <div style={{ marginTop: 20 }}>
-                  <div style={{ background: C.greenLight, borderRadius: 10, padding: '12px 16px',
-                    border: `1.5px solid ${C.green}`, marginBottom: 14 }}>
-                    <div style={{ fontWeight: 700, color: C.green, marginBottom: 4 }}>✓ Goed gedaan!</div>
+                  <div style={{ background: isAnswerCorrect === false ? C.redLight : C.greenLight,
+                    borderRadius: 10, padding: '12px 16px',
+                    border: `1.5px solid ${isAnswerCorrect === false ? C.red : C.green}`, marginBottom: 14 }}>
+                    <div style={{ fontWeight: 700, color: isAnswerCorrect === false ? C.red : C.green, marginBottom: 4 }}>
+                      {isAnswerCorrect === false ? '✗ Niet helemaal goed…' : '✓ Goed gedaan!'}
+                    </div>
                     <div style={{ fontSize: 13, color: C.text }}>
-                      {phase === 'easy' && hasVariants
-                        ? 'Klaar voor de moeilijkere versie?'
-                        : 'Je hebt de oefening afgerond.'}
+                      {isAnswerCorrect === false
+                        ? isMathType
+                          ? 'Kijk naar de rode vakjes — het goede antwoord staat erbij.'
+                          : isTellenMode
+                            ? `Tel nog eens! Het goede antwoord is ${blockTotalCount}.`
+                            : isGoedFoutMode
+                              ? `Niet goed. Het antwoord is: ${goedFoutCorrect}.`
+                              : 'Kijk nog eens goed.'
+                        : phase === 'easy' && hasVariants
+                          ? 'Klaar voor de moeilijkere versie?'
+                          : 'Je hebt de oefening afgerond.'}
                     </div>
                   </div>
 
