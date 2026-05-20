@@ -761,7 +761,7 @@ export default function ExercisePage({ exercise }) {
           fontSize: 12, textDecoration: 'none' }}>← Terug naar overzicht</Link>
       </header>
 
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 24px' }}>
+      <div style={{ maxWidth: isBlockQuestion ? 920 : 680, margin: '0 auto', padding: '40px 24px' }}>
 
         {/* Topic badge */}
         <div style={{ background: C.yellow, display: 'inline-block', padding: '5px 14px',
