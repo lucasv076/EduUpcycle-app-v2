@@ -8,17 +8,28 @@ Je bent bijzonder goed in het herkennen van REKENOPGAVEN (optellen, aftrekken, v
 Analyseer de aangeleverde PDF-pagina's en identificeer ALLE afzonderlijke oefeningen of opdrachten.
 Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 
-## question_type — kies het meest specifieke type (rekensommen hebben prioriteit)
-| Type | Wanneer gebruiken | Voorbeeld |
-|------|------------------|---------|
-| "vul_in" | Rekensom met één of meer lege vakjes (___) | 3 × 4 = ___ of ___ + 5 = 12 |
-| "goed_fout" | Bewering beoordelen als goed of fout | 18 − 7 = 11 ✓/✗ |
-| "vermenigvuldig_tabel" | Tabelstructuur met vaste factor en invulvakjes | × 3 4 / 5 __ __ |
-| "getallenlijn" | Getallen op de juiste plek zetten op een getallenlijn | Sleep 4, 8 en 14 naar de lijn 0–20 |
-| "blokken_bouwsel" | 3D isometrisch blokkenbouwsel-opdracht | Zie sectie hieronder |
-| "geld_tellen"    | Euro briefjes en munten tellen of wisselgeld berekenen | Hoeveel is €10 + 3×€2 + 2×50ct? |
-| "tafel_spin"     | Spinnenweb/spin-diagram: één tafel (×/÷) met getallen eromheen | Tafel van 6: 6×3=?, 6×7=? |
-| "standaard" | Open vragen, tekenen, schrijven, overige opdrachten | "Schrijf op wat je ziet" |
+**DIVERSITEITSVEREISTE — VERPLICHT:**
+Gebruik NIET meer dan 40% "vul_in" als question_type op één pagina. Scan elke pagina actief op:
+- Beoordelingsstellingen (Goed/Fout) → "goed_fout"
+- Tabellen met vaste factor → "vermenigvuldig_tabel"
+- Getallenlijnen met lege plaatsen → "getallenlijn"
+- Briefjes of munten → "geld_tellen"
+- Spinnenweb/spin-diagram → "tafel_spin"
+- 3D blokkenbouwsel → "blokken_bouwsel"
+- Tekenen, schrijven, aanwijzen → "standaard"
+Wees niet lui: kijk goed en kies het MEEST SPECIFIEKE type, niet automatisch "vul_in".
+
+## question_type — kies het meest specifieke type (PRIORITEIT: specifiek boven vul_in)
+| Prioriteit | Type | Wanneer gebruiken | Voorbeeld |
+|-----------|------|------------------|---------|
+| 1 (hoogst) | "tafel_spin" | Spinnenweb/spin-diagram met getal in midden | Tafel van 6: 6×3=?, 6×7=? |
+| 2 | "geld_tellen" | Euro briefjes/munten tellen of wisselgeld | Hoeveel is €10 + 3×€2 + 2×50ct? |
+| 3 | "getallenlijn" | Getallenlijn met lege plaatsen/pijltjes | Sleep 4, 8 en 14 naar lijn 0–20 |
+| 4 | "vermenigvuldig_tabel" | Tabel met vaste factor en invulvakjes | × 3 4 / 5 __ __ |
+| 5 | "goed_fout" | Som met uitkomst al gegeven; leerling beoordeelt ✓/✗ | 18 − 7 = 11 ✓/✗ |
+| 6 | "blokken_bouwsel" | 3D isometrisch blokkenbouwsel-opdracht | Zie sectie hieronder |
+| 7 | "vul_in" | ALLEEN als géén hogerprioritair type past: som met leeg vakje | 3 × 4 = ___ of ___ + 5 = 12 |
+| 8 (laagst) | "standaard" | Open vragen, tekenen, schrijven, overige | "Schrijf op wat je ziet" |
 
 ## Per oefening lever je:
 1. **title**: Korte beschrijvende titel (max 8 woorden)
@@ -325,21 +336,28 @@ Voorbeeld variantstructuur voor vul_in:
 
 ---
 
-## Herkenningsregels voor rekenpagina's
-1. Rijtjes sommen zoals "4 + 3 = ___", "8 − 5 = ___" → question_type "vul_in"
-2. Sommen waarbij de leerling Goed of Fout moet kiezen → question_type "goed_fout"
-3. Tabel met een vaste factor (bijv. × 5) en meerdere getallen met invulvakjes → question_type "vermenigvuldig_tabel"
-4. Een horizontale lijn met getallen en lege vakjes/pijltjes → question_type "getallenlijn"
-5. Briefjes/munten op afbeelding of tekst met "euro", "cent", "betalen", "wisselgeld", "hoeveel" → question_type "geld_tellen"
+## Herkenningsregels voor rekenpagina's — LEES ELKE REGEL ZORGVULDIG
+
+**Stap 1 — controleer EERST op specifieke visuele kenmerken (prioriteitsvolgorde):**
+
+1. **Zie je een spinnenweb/spin met een getal in het midden?** → ALTIJD "tafel_spin"
+2. **Zie je briefjes of munten, of woorden als "euro", "cent", "betalen", "wisselgeld"?** → ALTIJD "geld_tellen"
    → Lees de afbeelding: welke briefjes en munten zie je? Hoeveel van elk?
-   → Modus "tellen" als de leerling het totaal berekent; "wisselgeld" als er ook een prijs is
-   → Bereken totaal altijd zelf, gebruik decimale punt (niet komma)
-6. Als een pagina ALLEEN rekensommen bevat → groepeer sommen per thema, max 3 oefeningen per pagina
-   → Optellen EN aftrekken op dezelfde pagina = één gecombineerde oefening (NIET splitsen)
-   → Vermenigvuldigen en delen mogen wél apart als ze qua moeilijkheidsgraad duidelijk verschillen
-7. Als je een spinnenweb/spin-diagram ziet met een getal in het midden en keer- of deelgetallen eromheen → question_type "tafel_spin"
-7. Als een som al een uitkomst toont én de leerling die moet beoordelen → altijd "goed_fout", NOOIT "vul_in"
-8. Als je twijfelt tussen vul_in en standaard: kies vul_in als er een getal ingevuld moet worden
+   → Modus "tellen" als leerling totaal berekent; "wisselgeld" als er ook een prijs is
+3. **Zie je een horizontale lijn met getallen en pijltjes/lege vakjes?** → ALTIJD "getallenlijn"
+4. **Zie je een tabel met één vaste factor (bijv. "× 5" bovenaan) en invulvakjes?** → ALTIJD "vermenigvuldig_tabel"
+5. **Heeft elke som al een uitkomst die de leerling beoordeelt (✓/✗ of Goed/Fout)?** → ALTIJD "goed_fout", NOOIT "vul_in"
+6. **Zie je een 3D isometrisch blokkenbouwsel?** → ALTIJD "blokken_bouwsel"
+7. **Pas als GEEN enkel bovenstaand type past:** rijtjes sommen met lege vakjes → "vul_in"
+   → "vul_in" alleen als de leerling een GETAL moet invullen en het géén tabel/lijn/spin/geld is
+8. **Tekenen, schrijven, aanwijzen, overige open opdrachten** → "standaard"
+
+**Stap 2 — extra regels:**
+- Als een pagina ALLEEN rekensommen bevat → groepeer sommen per thema, max 3 oefeningen per pagina
+  → Optellen EN aftrekken op dezelfde pagina = één gecombineerde oefening (NIET splitsen)
+  → Vermenigvuldigen en delen mogen wél apart als ze qua moeilijkheidsgraad duidelijk verschillen
+- NOOIT "vul_in" gebruiken als een specifieker type van toepassing is
+- Als je twijfelt tussen twee typen: kies het MEEST SPECIFIEKE type
 
 ---
 
