@@ -304,8 +304,10 @@ function buildGeldBase(data) {
 
 function freshGeldTellen(data) {
   const base = buildGeldBase(data);
-  const types = ['invul', 'meerkeuze', 'goed_fout'];
-  const geld_vraag_type = types[rand(0, types.length - 1)];
+  const VALID_TYPES = ['invul', 'meerkeuze', 'goed_fout'];
+  const geld_vraag_type = VALID_TYPES.includes(data.geld_vraag_type)
+    ? data.geld_vraag_type
+    : VALID_TYPES[rand(0, VALID_TYPES.length - 1)];
 
   if (geld_vraag_type === 'meerkeuze') {
     const distractors = generateDisstractors(base.totaal);
