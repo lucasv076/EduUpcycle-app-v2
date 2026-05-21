@@ -8,6 +8,7 @@ import { ExerciseIllustration } from '@/components/illustrations';
 import { BlokkenBouwselInteractive, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import { GetallenLijnInteractief } from '@/components/getallenlijn';
 import { GeldTellenInteractief } from '@/components/geld-tellen';
+import { TafelSpinInteractief } from '@/components/tafel-spin';
 import { THEMA_EMOJIS, parseSomNums, randomThema } from '@/lib/math-generator';
 
 // ── Tiny helpers ──────────────────────────────────────────────────────
@@ -89,7 +90,7 @@ function StudentPreview({ exercise, onClose }) {
   const hardVariant = exercise.variants?.[1];
   const hasVariants = !!(easyVariant && hardVariant);
 
-  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen'];
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen', 'tafel_spin'];
   const isMathType = MATH_TYPES.includes(exercise.question_type);
   const activeRekensomData = isMathType
     ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
@@ -155,6 +156,13 @@ function StudentPreview({ exercise, onClose }) {
           const inputVal = String(mathAnswers[0] || '').replace(',', '.').trim();
           const studentAmount = parseFloat(inputVal);
           return !isNaN(studentAmount) && activeRekensomData?.totaal != null && Math.abs(studentAmount - activeRekensomData.totaal) < 0.005;
+        }
+        if (exercise.question_type === 'tafel_spin') {
+          const vragen = activeRekensomData?.vragen || [];
+          const tvt = activeRekensomData?.tafel_vraag_type || 'invul';
+          if (tvt === 'meerkeuze')
+            return vragen.length > 0 && vragen.every((v, i) => parseInt(mathAnswers[i]) === v.correct_optie_index);
+          return vragen.length > 0 && vragen.every((v, i) => Number(mathAnswers[i]) === v.antwoord);
         }
         return false;
       })()
@@ -291,6 +299,19 @@ function StudentPreview({ exercise, onClose }) {
           value={mathAnswers[0] ?? ''}
           onAnswerChange={(val) => setMathAnswers(p => ({ ...p, 0: val }))}
           isCorrect={submitted ? mathIsCorrect : null}
+        />
+      );
+    }
+
+    // ── Tafel spin ──
+    if (exercise.question_type === 'tafel_spin' && activeRekensomData?.vragen?.length) {
+      return (
+        <TafelSpinInteractief
+          key={`ts-${phase}`}
+          data={activeRekensomData}
+          submitted={submitted}
+          mathAnswers={mathAnswers}
+          onAnswerChange={(i, val) => setMathAnswers(p => ({ ...p, [i]: val }))}
         />
       );
     }
@@ -1211,6 +1232,52 @@ export default function EduUpcycleApp() {
                           </div>
                         ))}
                       </div>
+
+                      {selected.question_type === 'tafel_spin' && selected.rekensom_data && (() => {
+                        const rd = selected.rekensom_data;
+                        const keerCount = (rd.vragen || []).filter(v => v.bewerking === 'keren').length;
+                        const n = (rd.vragen || []).length;
+                        const centerLabel = keerCount > n / 2 ? `× ${rd.tafel}` : keerCount === 0 ? `÷ ${rd.tafel}` : `${rd.tafel}`;
+                        return (
+                          <>
+                            <SL>Tafel spin preview</SL>
+                            <IB>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                <div style={{
+                                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                                  background: `linear-gradient(135deg, ${C.purple}, ${C.purpleDark})`,
+                                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                  boxShadow: '0 2px 8px rgba(109,32,119,0.3)',
+                                }}>
+                                  <span style={{ fontSize: 18, lineHeight: 1 }}>🐒</span>
+                                  <span style={{ fontSize: 8, fontWeight: 900, color: 'white', fontFamily: 'monospace' }}>
+                                    {centerLabel}
+                                  </span>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>
+                                    Tafel van {rd.tafel}
+                                  </div>
+                                  <div style={{ fontSize: 11, color: C.textMid }}>
+                                    {(rd.bewerkingen || []).join(' & ')} · {rd.tafel_vraag_type || 'invul'} · bereik {rd.bereik_min ?? 1}–{rd.bereik_max ?? 10}
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                {(rd.vragen || []).slice(0, 6).map((v, i) => (
+                                  <span key={i} style={{
+                                    background: C.purpleLight, color: C.purple,
+                                    borderRadius: 6, padding: '3px 8px',
+                                    fontSize: 11, fontFamily: 'monospace', fontWeight: 700,
+                                  }}>
+                                    {v.tekst.replace('___', '?')}
+                                  </span>
+                                ))}
+                              </div>
+                            </IB>
+                          </>
+                        );
+                      })()}
 
                       {selected.question_type === 'blokken_bouwsel' && (() => {
                         const sit = ['tellen','goedFout','bouwen','meerkeuze'].includes(selected.block_interaction_type)

@@ -6,6 +6,7 @@ import { C } from '@/lib/colors';
 import { BlokkenBouwselInteractive, gridsEqual, CubePreview, PlanGridDisplay, clampGrid } from '@/components/blokken-bouwsel';
 import { GetallenLijnInteractief } from '@/components/getallenlijn';
 import { GeldTellenInteractief } from '@/components/geld-tellen';
+import { TafelSpinInteractief } from '@/components/tafel-spin';
 import SubmissionHistory from '@/components/SubmissionHistory';
 import { getProgress, recordAttempt } from '@/lib/progress';
 import { generateFreshRekensomData, THEMA_EMOJIS, parseSomNums } from '@/lib/math-generator';
@@ -34,6 +35,7 @@ const VAARDIGHEID_MAP = {
   'vermenigvuldig_tabel': 'Je vult de ontbrekende uitkomsten in de tabel in.',
   'getallenlijn':         'Je plaatst de getallen op de juiste plek op de getallenlijn.',
   'geld_tellen':          'Je telt euro-briefjes en munten op en berekent het totaalbedrag.',
+  'tafel_spin':           'Je oefent de tafels door keer- en deelsommen in te vullen op het spinnenweb.',
   // Blokkenbouwsel per interactietype
   'blokken_meerkeuze':    'Je herkent welk 3D-bouwsel bij de plattegrond hoort.',
   'blokken_tellen':       'Je telt hoeveel blokjes er in het bouwsel zitten.',
@@ -116,7 +118,7 @@ export default function ExercisePage({ exercise }) {
   const hasVariants = !!(easyVariant && hardVariant);
 
   // Math question type detection
-  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen'];
+  const MATH_TYPES = ['vul_in', 'goed_fout', 'vermenigvuldig_tabel', 'getallenlijn', 'geld_tellen', 'tafel_spin'];
   const isMathType = MATH_TYPES.includes(exercise.question_type);
   const activeRekensomData = isMathType
     ? ((phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data)
@@ -204,6 +206,13 @@ export default function ExercisePage({ exercise }) {
           const inputVal = String(mathAnswers[0] || '').replace(',', '.').trim();
           const studentAmount = parseFloat(inputVal);
           return !isNaN(studentAmount) && rekData?.totaal != null && Math.abs(studentAmount - rekData.totaal) < 0.005;
+        }
+        if (exercise.question_type === 'tafel_spin') {
+          const vragen = displayRekensomData.vragen || [];
+          const tvt = displayRekensomData.tafel_vraag_type || 'invul';
+          if (tvt === 'meerkeuze')
+            return vragen.length > 0 && vragen.every((v, i) => parseInt(mathAnswers[i]) === v.correct_optie_index);
+          return vragen.length > 0 && vragen.every((v, i) => Number(mathAnswers[i]) === v.antwoord);
         }
         return false;
       })()
@@ -345,6 +354,10 @@ export default function ExercisePage({ exercise }) {
         }
         if (exercise.question_type === 'geld_tellen') {
           return mathAnswers[0] !== undefined && String(mathAnswers[0]).trim() !== '';
+        }
+        if (exercise.question_type === 'tafel_spin') {
+          const vragen = displayRekensomData.vragen || [];
+          return vragen.length > 0 && vragen.every((_, i) => mathAnswers[i] !== undefined && String(mathAnswers[i]).trim() !== '');
         }
         return false;
       })()
@@ -554,6 +567,22 @@ export default function ExercisePage({ exercise }) {
             value={mathAnswers[0] ?? ''}
             onAnswerChange={(val) => setMathAnswers(prev => ({ ...prev, 0: val }))}
             isCorrect={submitted ? mathIsCorrect : null}
+          />
+        );
+      }
+    }
+
+    // ── Tafel spin: spinnenweb met aapje in het midden ──
+    if (exercise.question_type === 'tafel_spin') {
+      const spinData = displayRekensomData ?? exercise.rekensom_data;
+      if (spinData?.vragen?.length) {
+        return (
+          <TafelSpinInteractief
+            key={`ts-${phase}-${inputKey}`}
+            data={spinData}
+            submitted={submitted}
+            mathAnswers={mathAnswers}
+            onAnswerChange={(i, val) => setMathAnswers(prev => ({ ...prev, [i]: val }))}
           />
         );
       }

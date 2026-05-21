@@ -334,6 +334,69 @@ function freshGeldTellen(data) {
   return { ...base, geld_vraag_type: 'invul' };
 }
 
+function generateTafelDistractors(antwoord, tafel, count = 3) {
+  const seen = new Set([antwoord]);
+  const candidates = [];
+  for (let k = 1; k <= 6 && candidates.length < count * 3; k++) {
+    const c1 = antwoord + tafel * k;
+    const c2 = antwoord - tafel * k;
+    if (c1 > 0 && !seen.has(c1)) { seen.add(c1); candidates.push(c1); }
+    if (c2 > 0 && !seen.has(c2)) { seen.add(c2); candidates.push(c2); }
+  }
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  return candidates.slice(0, count);
+}
+
+function freshTafelSpin(data, count = 5) {
+  const tafel = data.tafel || 3;
+  const bewerkingen = Array.isArray(data.bewerkingen) && data.bewerkingen.length
+    ? data.bewerkingen
+    : ['keren'];
+  const tvt = ['invul', 'meerkeuze'].includes(data.tafel_vraag_type)
+    ? data.tafel_vraag_type
+    : 'invul';
+
+  const lo = Math.max(1, data.bereik_min ?? 1);
+  const hi = Math.max(lo + 2, data.bereik_max ?? 10);
+
+  const vragen = [];
+  const seen = new Set();
+  let attempts = count * 40;
+
+  while (vragen.length < count && attempts-- > 0) {
+    const bewerking = bewerkingen[rand(0, bewerkingen.length - 1)];
+    const getal = rand(lo, hi);
+    let tekst, antwoord;
+
+    if (bewerking === 'keren') {
+      tekst = `${tafel} × ${getal} = ___`;
+      antwoord = tafel * getal;
+    } else {
+      antwoord = getal;
+      tekst = `${tafel * getal} ÷ ${tafel} = ___`;
+    }
+
+    if (seen.has(tekst)) continue;
+    seen.add(tekst);
+
+    const vraag = { tekst, antwoord, bewerking, getal };
+    if (tvt === 'meerkeuze') {
+      const distractors = generateTafelDistractors(antwoord, tafel, 3);
+      const opties = [antwoord, ...distractors].sort(() => Math.random() - 0.5);
+      vraag.opties = opties;
+      vraag.correct_optie_index = opties.indexOf(antwoord);
+    }
+    vragen.push(vraag);
+  }
+
+  return vragen.length >= count
+    ? { ...data, tafel_vraag_type: tvt, vragen }
+    : data;
+}
+
 export function generateFreshRekensomData(rekensomData, questionType, count = 5) {
   if (!rekensomData) return null;
   try {
@@ -342,6 +405,7 @@ export function generateFreshRekensomData(rekensomData, questionType, count = 5)
     if (questionType === 'vermenigvuldig_tabel') return freshTabel(rekensomData, count);
     if (questionType === 'getallenlijn') return freshGetallenLijn(rekensomData);
     if (questionType === 'geld_tellen') return freshGeldTellen(rekensomData);
+    if (questionType === 'tafel_spin') return freshTafelSpin(rekensomData, count);
   } catch (e) {
     console.warn('math-generator fallback:', e);
   }

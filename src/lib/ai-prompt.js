@@ -17,6 +17,7 @@ Gebruik altijd zowel tekst als visuele informatie uit de afbeelding.
 | "getallenlijn" | Getallen op de juiste plek zetten op een getallenlijn | Sleep 4, 8 en 14 naar de lijn 0–20 |
 | "blokken_bouwsel" | 3D isometrisch blokkenbouwsel-opdracht | Zie sectie hieronder |
 | "geld_tellen"    | Euro briefjes en munten tellen of wisselgeld berekenen | Hoeveel is €10 + 3×€2 + 2×50ct? |
+| "tafel_spin"     | Spinnenweb/spin-diagram: één tafel (×/÷) met getallen eromheen | Tafel van 6: 6×3=?, 6×7=? |
 | "standaard" | Open vragen, tekenen, schrijven, overige opdrachten | "Schrijf op wat je ziet" |
 
 ## Per oefening lever je:
@@ -220,6 +221,46 @@ Regels voor getallenlijn:
 - "gegeven_getallen" bevat 2-4 ankerpunten
 - Controleer zelf: lijn_min < alle te_plaatsen < lijn_max
 
+### "tafel_spin" — spinnenweb voor één tafel (keren en/of delen):
+{
+  "tafel": 6,
+  "bewerkingen": ["keren"],
+  "tafel_vraag_type": "invul",
+  "bereik_min": 1,
+  "bereik_max": 10,
+  "vragen": [
+    { "tekst": "6 × 3 = ___", "antwoord": 18, "bewerking": "keren", "getal": 3 },
+    { "tekst": "6 × 7 = ___", "antwoord": 42, "bewerking": "keren", "getal": 7 }
+  ]
+}
+
+Regels voor tafel_spin:
+- "tafel": het vaste getal in het midden van het spinnenweb (bijv. 6 voor de tafel van 6)
+- "bewerkingen": ["keren"] voor alleen vermenigvuldigen, ["delen"] voor alleen delen, ["keren","delen"] voor beide
+- "tafel_vraag_type": "invul" (leerling typt het antwoord) of "meerkeuze" (4 keuzes)
+- "bereik_min" / "bereik_max": het bereik van de getallen (niet van de tafel zelf)
+  → Geef minstens bereik_max − bereik_min + 1 ≥ 5 zodat 5 unieke vragen mogelijk zijn
+- "vragen": minimaal 5 voorbeeldvragen; het systeem genereert automatisch verse vragen bij elke poging
+- "antwoord": altijd exact berekend — bereken zelf (tafel × getal voor keren, getal voor delen)
+- Voor "meerkeuze" varianten: hetzelfde schema maar met tafel_vraag_type: "meerkeuze"
+
+Voorbeeld moeilijkere variant (tafels keren en delen):
+{
+  "level": "Moeilijker",
+  "text": "Bereken de uitkomsten op het spinnenweb.",
+  "rekensom_data": {
+    "tafel": 8,
+    "bewerkingen": ["keren", "delen"],
+    "tafel_vraag_type": "invul",
+    "bereik_min": 2,
+    "bereik_max": 12,
+    "vragen": [
+      { "tekst": "8 × 4 = ___", "antwoord": 32, "bewerking": "keren", "getal": 4 },
+      { "tekst": "40 ÷ 8 = ___", "antwoord": 5, "bewerking": "delen", "getal": 5 }
+    ]
+  }
+}
+
 ### Voor "standaard" en "blokken_bouwsel": gebruik "rekensom_data": null
 ### Voor "geld_tellen": zie de geld_tellen-sectie hierboven voor het volledige schema
 
@@ -296,6 +337,7 @@ Voorbeeld variantstructuur voor vul_in:
 6. Als een pagina ALLEEN rekensommen bevat → groepeer sommen per thema, max 3 oefeningen per pagina
    → Optellen EN aftrekken op dezelfde pagina = één gecombineerde oefening (NIET splitsen)
    → Vermenigvuldigen en delen mogen wél apart als ze qua moeilijkheidsgraad duidelijk verschillen
+7. Als je een spinnenweb/spin-diagram ziet met een getal in het midden en keer- of deelgetallen eromheen → question_type "tafel_spin"
 7. Als een som al een uitkomst toont én de leerling die moet beoordelen → altijd "goed_fout", NOOIT "vul_in"
 8. Als je twijfelt tussen vul_in en standaard: kies vul_in als er een getal ingevuld moet worden
 
