@@ -1,6 +1,6 @@
 // Server Component — haalt één oefening op uit Supabase en geeft hem door
 import { notFound } from 'next/navigation';
-import { getExerciseById } from '@/lib/supabase';
+import { getExerciseById, getAllExercises } from '@/lib/supabase';
 import ExercisePage from './ExercisePage';
 
 export async function generateMetadata({ params }) {
@@ -15,11 +15,14 @@ export async function generateMetadata({ params }) {
 
 export default async function StudentExercisePage({ params }) {
   let exercise = null;
+  let allIds = [];
 
   try {
     exercise = await getExerciseById(params.id);
+    // Haal alle oefeningen op voor "volgende vraag" navigatie
+    const all = await getAllExercises();
+    allIds = (all || []).map(e => ({ id: e.id, topic: e.topic, question_type: e.question_type, title: e.title }));
   } catch (e) {
-    // Supabase niet bereikbaar of fout
     console.error('[student/[id]]', e.message);
   }
 
@@ -34,5 +37,5 @@ export default async function StudentExercisePage({ params }) {
     ...studentExercise
   } = exercise;
 
-  return <ExercisePage exercise={studentExercise} />;
+  return <ExercisePage exercise={studentExercise} allExercises={allIds} />;
 }

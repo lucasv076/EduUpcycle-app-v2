@@ -1,11 +1,13 @@
 // ── Voortgang per oefening (localStorage) ─────────────────────────────
 //
 // Slaat per oefening op: correctStreak, incorrectStreak, level, totalAttempts.
-// Level: 'easy' of 'hard'.
+// Level: 'easy', 'medium' of 'hard' (3 niveaus).
 // Regels:
-//   - 3x achter elkaar goed op easy → door naar hard
-//   - 2x achter elkaar fout op hard → terug naar easy
-//   - Goed antwoord reset incorrectStreak, fout reset correctStreak
+//   - 3x achter elkaar goed op easy   → door naar medium
+//   - 3x achter elkaar goed op medium → door naar hard
+//   - 2x achter elkaar fout op medium → terug naar easy
+//   - 2x achter elkaar fout op hard   → terug naar medium
+//   - Goed antwoord reset incorrectStreak, fout trekt 1 af van correctStreak (kindvriendelijk)
 //
 // Alle functies zijn puur (ontvangen/retourneren data) behalve
 // save/load die localStorage aanraken. Dat maakt ze testbaar.
@@ -63,20 +65,35 @@ export function recordAttempt(exerciseId, correct) {
     next.correctStreak = prev.correctStreak + 1;
     next.incorrectStreak = 0;
 
-    // 3x goed op easy → door naar hard
+    // 3x goed op easy → door naar medium
     if (next.level === 'easy' && next.correctStreak >= 3) {
+      next.level = 'medium';
+      next.correctStreak = 0;
+      levelChange = 'up';
+    }
+    // 3x goed op medium → door naar hard
+    else if (next.level === 'medium' && next.correctStreak >= 3) {
       next.level = 'hard';
       next.correctStreak = 0;
       levelChange = 'up';
     }
   } else {
     next.incorrectStreak = prev.incorrectStreak + 1;
-    next.correctStreak = 0;
+    // Kindvriendelijk: 1 stap terug i.p.v. helemaal resetten
+    next.correctStreak = Math.max(0, prev.correctStreak - 1);
 
-    // 2x fout op hard → terug naar easy
-    if (next.level === 'hard' && next.incorrectStreak >= 2) {
+    // 2x fout op medium → terug naar easy
+    if (next.level === 'medium' && next.incorrectStreak >= 2) {
       next.level = 'easy';
       next.incorrectStreak = 0;
+      next.correctStreak = 0;
+      levelChange = 'down';
+    }
+    // 2x fout op hard → terug naar medium
+    else if (next.level === 'hard' && next.incorrectStreak >= 2) {
+      next.level = 'medium';
+      next.incorrectStreak = 0;
+      next.correctStreak = 0;
       levelChange = 'down';
     }
   }
@@ -103,16 +120,25 @@ export function computeNextProgress(prev, correct) {
     next.incorrectStreak = 0;
 
     if (next.level === 'easy' && next.correctStreak >= 3) {
+      next.level = 'medium';
+      next.correctStreak = 0;
+      levelChange = 'up';
+    } else if (next.level === 'medium' && next.correctStreak >= 3) {
       next.level = 'hard';
       next.correctStreak = 0;
       levelChange = 'up';
     }
   } else {
     next.incorrectStreak = prev.incorrectStreak + 1;
-    next.correctStreak = 0;
+    // Kindvriendelijk: 1 stap terug i.p.v. helemaal resetten
+    next.correctStreak = Math.max(0, prev.correctStreak - 1);
 
-    if (next.level === 'hard' && next.incorrectStreak >= 2) {
+    if (next.level === 'medium' && next.incorrectStreak >= 2) {
       next.level = 'easy';
+      next.incorrectStreak = 0;
+      levelChange = 'down';
+    } else if (next.level === 'hard' && next.incorrectStreak >= 2) {
+      next.level = 'medium';
       next.incorrectStreak = 0;
       levelChange = 'down';
     }

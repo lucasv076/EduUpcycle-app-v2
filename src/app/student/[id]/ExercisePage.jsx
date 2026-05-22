@@ -9,7 +9,7 @@ import { GeldTellenInteractief } from '@/components/geld-tellen';
 import { TafelSpinInteractief } from '@/components/tafel-spin';
 import SubmissionHistory from '@/components/SubmissionHistory';
 import { getProgress, recordAttempt } from '@/lib/progress';
-import { generateFreshRekensomData, THEMA_EMOJIS, parseSomNums } from '@/lib/math-generator';
+import { generateFreshRekensomData, generateFreshBlokkenData, THEMA_EMOJIS, parseSomNums } from '@/lib/math-generator';
 
 // Generate or retrieve a stable session ID
 function getSessionId() {
@@ -67,6 +67,120 @@ const ZwijsenLogo = () => (
   </div>
 );
 
+// ── Uitleg-generator: kindvriendelijke uitleg bij fout antwoord ──────
+function generateUitleg(som, questionType) {
+  if (!som) return null;
+
+  // Vul-in sommen: meerdere formaten herkennen
+  if (questionType === 'vul_in') {
+    const tekst = som.tekst;
+    const answer = som.antwoord;
+
+    // Format: a + b = ___ of a - b = ___
+    const fmtResult = tekst.match(/^(\d+)\s*([+\-−])\s*(\d+)\s*=\s*___/);
+    if (fmtResult) {
+      const a = parseInt(fmtResult[1]), op = fmtResult[2], b = parseInt(fmtResult[3]);
+      const isAdd = op === '+';
+      const isSub = op === '-' || op === '−';
+      if (isAdd) {
+        if (b <= 5) {
+          const steps = Array.from({ length: b }, (_, i) => a + i + 1);
+          return `Tel ${b} verder vanaf ${a}: ${steps.join(', ')}. Dus ${a} + ${b} = ${answer}.`;
+        }
+        return `${a} + ${b} = ${answer}. Tip: splits ${b} in stukjes die makkelijker zijn!`;
+      }
+      if (isSub) {
+        if (b <= 5) {
+          const steps = Array.from({ length: b }, (_, i) => a - i - 1);
+          return `Tel ${b} terug vanaf ${a}: ${steps.join(', ')}. Dus ${a} − ${b} = ${answer}.`;
+        }
+        return `${a} − ${b} = ${answer}. Tip: hoeveel moet je van ${a} afhalen om op ${answer} te komen?`;
+      }
+    }
+
+    // Format: a + ___ = c  (vul aan)
+    const fmtMid = tekst.match(/^(\d+)\s*([+\-−])\s*___\s*=\s*(\d+)/);
+    if (fmtMid) {
+      const a = parseInt(fmtMid[1]), op = fmtMid[2], c = parseInt(fmtMid[3]);
+      const isAdd = op === '+';
+      const isSub = op === '-' || op === '−';
+      if (isAdd) return `Hoeveel moet je bij ${a} optellen om ${c} te krijgen? ${c} − ${a} = ${answer}.`;
+      if (isSub) return `Hoeveel moet je van ${a} afhalen om ${c} te krijgen? ${a} − ${c} = ${answer}.`;
+    }
+
+    // Format: ___ + b = c  of  ___ - b = c
+    const fmtStart = tekst.match(/^___\s*([+\-−])\s*(\d+)\s*=\s*(\d+)/);
+    if (fmtStart) {
+      const op = fmtStart[1], b = parseInt(fmtStart[2]), c = parseInt(fmtStart[3]);
+      const isAdd = op === '+';
+      const isSub = op === '-' || op === '−';
+      if (isAdd) return `Welk getal plus ${b} is ${c}? ${c} − ${b} = ${answer}.`;
+      if (isSub) return `Welk getal min ${b} is ${c}? ${c} + ${b} = ${answer}.`;
+    }
+
+    // Format: a × b = ___ (vermenigvuldiging / tafelsommen)
+    const fmtMul = tekst.match(/^(\d+)\s*[×x*]\s*(\d+)\s*=\s*___/);
+    if (fmtMul) {
+      const a = parseInt(fmtMul[1]), b = parseInt(fmtMul[2]);
+      return `${a} × ${b} = ${answer}. Tip: tel ${a} keer het getal ${b} op!`;
+    }
+
+    return `Het goede antwoord is ${answer}.`;
+  }
+
+  // Goed/fout stellingen: leg uit waarom het goed of fout is
+  if (questionType === 'goed_fout') {
+    const m = som.tekst.match(/^(\d+)\s*([+\-−×x*])\s*(\d+)\s*=\s*(\d+)/);
+    if (!m) return som.klopt ? 'Deze som klopt!' : 'Deze som klopt niet.';
+    const a = parseInt(m[1]);
+    const opChar = m[2];
+    const b = parseInt(m[3]);
+    const shown = parseInt(m[4]);
+    const isAdd = opChar === '+';
+    const isSub = opChar === '-' || opChar === '−';
+    const isMul = opChar === '×' || opChar === 'x' || opChar === '*';
+    const real = isAdd ? a + b : isSub ? a - b : isMul ? a * b : null;
+    if (real === null) return som.klopt ? 'Deze som klopt!' : 'Deze som klopt niet.';
+    if (som.klopt) {
+      return `${a} ${opChar} ${b} = ${shown} klopt! Goed gezien.`;
+    }
+    return `${a} ${opChar} ${b} = ${real}, niet ${shown}. Dus deze som klopt niet.`;
+  }
+
+  return null;
+}
+
+// Geld-tellen uitleg — werkt voor zowel 'tellen' als 'wisselgeld' modus
+function generateGeldUitleg(geldData) {
+  if (!geldData || geldData.totaal == null) return null;
+
+  const fmt = (n) => `€${Number(n).toFixed(2).replace('.', ',')}`;
+  const isWisselgeld = geldData.modus === 'wisselgeld';
+
+  if (isWisselgeld && geldData.prijs != null) {
+    // Wisselgeld: bereken betaald bedrag, trek prijs af
+    const items = (geldData.items || []).filter(i => i.waarde > 0 && i.aantal > 0);
+    const betaald = items.reduce((s, it) => s + it.waarde * it.aantal, 0);
+    const betaaldParts = [];
+    for (const item of items) {
+      const label = item.waarde >= 1 ? `€${item.waarde}` : `${Math.round(item.waarde * 100)}ct`;
+      for (let n = 0; n < item.aantal; n++) betaaldParts.push(label);
+    }
+    const betaaldStr = betaaldParts.length > 1 ? `${betaaldParts.join(' + ')} = ${fmt(betaald)}` : fmt(betaald);
+    return `Je betaalt ${betaaldStr} en het kost ${fmt(geldData.prijs)}. Wisselgeld: ${fmt(betaald)} − ${fmt(geldData.prijs)} = ${fmt(geldData.totaal)}.`;
+  }
+
+  // Tellen-modus: tel alle munten en briefjes op
+  const items = (geldData.items || []).filter(i => i.waarde > 0 && i.aantal > 0);
+  const parts = [];
+  for (const item of items) {
+    const label = item.waarde >= 1 ? `€${item.waarde}` : `${Math.round(item.waarde * 100)}ct`;
+    for (let n = 0; n < item.aantal; n++) parts.push(label);
+  }
+  if (parts.length === 0) return null;
+  return `Tel alle bedragen bij elkaar op: ${parts.join(' + ')} = ${fmt(geldData.totaal)}.`;
+}
+
 const MAX_VIZ = 12;
 
 function EmojiHint({ som, emoji }) {
@@ -95,7 +209,7 @@ function EmojiHint({ som, emoji }) {
   );
 }
 
-export default function ExercisePage({ exercise }) {
+export default function ExercisePage({ exercise, allExercises = [] }) {
   const [phase, setPhase]         = useState('easy');
   const [answer, setAnswer]       = useState('');
   const [mathAnswers, setMathAnswers] = useState({});
@@ -106,10 +220,15 @@ export default function ExercisePage({ exercise }) {
   const [attempts, setAttempts]   = useState(0);
   const [streak, setStreak]       = useState({ correctStreak: 0, incorrectStreak: 0, level: 'easy', totalAttempts: 0, totalCorrect: 0 });
   const [levelMsg, setLevelMsg]   = useState(null);
+  const [mastered, setMastered]   = useState(false);
+  const [freshBlockData, setFreshBlockData] = useState(null);
   const recorded = useRef(false);
+
+  const [mounted, setMounted] = useState(false);
 
   // Initialize session ID on mount
   useEffect(() => {
+    setMounted(true);
     setSessionId(getSessionId());
   }, []);
 
@@ -128,11 +247,14 @@ export default function ExercisePage({ exercise }) {
   const displayRekensomData = currentRekensomData ?? activeRekensomData;
 
   const isBlockQuestion = exercise.question_type === 'blokken_bouwsel';
+  // Effectieve block data: verse data overschrijft originele exercise data
+  const blockEx = freshBlockData ? { ...exercise, ...freshBlockData } : exercise;
+
   const VALID_BLOCK_TYPES = ['tellen', 'goedFout', 'bouwen', 'meerkeuze'];
   const blockInteractionType = isBlockQuestion
     ? (VALID_BLOCK_TYPES.includes(exercise.block_interaction_type)
         ? exercise.block_interaction_type
-        : (exercise.block_option_a_grid?.length && exercise.block_option_b_grid?.length
+        : (blockEx.block_option_a_grid?.length && blockEx.block_option_b_grid?.length
             ? 'meerkeuze'
             : 'goedFout'))
     : null;
@@ -144,12 +266,19 @@ export default function ExercisePage({ exercise }) {
   const isTellenMode = activeBlockInteractionType === 'tellen';
   const isGoedFoutMode = activeBlockInteractionType === 'goedFout';
   const isMeerkeuzMode = activeBlockInteractionType === 'meerkeuze';
-  const maxH = exercise.block_max_height || 5;
+  const maxH = blockEx.block_max_height || 5;
 
-  // Bij laden: haal opgeslagen studentniveau op (fase start altijd op 'easy')
+  // Bij laden: haal opgeslagen studentniveau op en bepaal startfase
   useEffect(() => {
-    const p = getProgress('student');
+    const p = getProgress(exercise.id);
     setStreak(p);
+    // Niveau bepaalt startvariant:
+    //   easy   → alleen easy variant
+    //   medium → easy, dan hard (standaard flow)
+    //   hard   → start direct op hard variant
+    if (p.level === 'hard' && hasVariants) {
+      setPhase('hard');
+    }
   }, [hasVariants]);
 
   // Genereer verse rekensommen bij fase-start (5 willekeurige vragen per poging)
@@ -167,12 +296,12 @@ export default function ExercisePage({ exercise }) {
     : rawQuestionText;
 
   // For block exercises, track whether the answer is actually correct
-  const blockTotalCount = isTellenMode && exercise.block_plan_grid
-    ? exercise.block_plan_grid.flat().reduce((s, v) => s + v, 0)
+  const blockTotalCount = isTellenMode && blockEx.block_plan_grid
+    ? blockEx.block_plan_grid.flat().reduce((s, v) => s + v, 0)
     : null;
 
   const goedFoutCorrectAnswer = isGoedFoutMode
-    ? (exercise.block_correct_option === 'A' ? 'Goed' : 'Fout')
+    ? (blockEx.block_correct_option === 'A' ? 'Goed' : 'Fout')
     : null;
 
   // Math correctness check
@@ -222,13 +351,13 @@ export default function ExercisePage({ exercise }) {
     ? isMathType
       ? mathIsCorrect
       : isBuildMode
-        ? gridsEqual(answer, exercise.block_plan_grid)
+        ? gridsEqual(answer, blockEx.block_plan_grid)
         : isTellenMode
           ? Number(answer) === blockTotalCount
           : isGoedFoutMode
             ? answer === goedFoutCorrectAnswer
             : isBlockQuestion
-              ? answer === exercise.block_correct_option
+              ? answer === blockEx.block_correct_option
               : true
     : null;
 
@@ -260,21 +389,30 @@ export default function ExercisePage({ exercise }) {
   }, [submitted, sessionId, answer, exercise.id, isBlockQuestion, isAnswerCorrect, phase]);
 
   // Registreer poging in streak/progress systeem
+  // NB: fase-wissel gebeurt NIET hier — dat doet handleRetry/handleDone,
+  // zodat de leerling eerst feedback op het huidige antwoord ziet.
   const record = (correct) => {
     if (recorded.current) return;
     recorded.current = true;
-    const { progress: updated, levelChange } = recordAttempt('student', correct);
+    const { progress: updated, levelChange } = recordAttempt(exercise.id, correct);
     setStreak(updated);
     if (levelChange) {
       setLevelMsg(levelChange);
-      setTimeout(() => setLevelMsg(null), 3000);
+      setTimeout(() => setLevelMsg(null), 6000);
+    }
+    // 3x goed op hard → klaar! (automatisch naar done na 3s)
+    if (correct && updated.level === 'hard' && updated.correctStreak >= 3) {
+      setMastered(true);
+      setTimeout(() => setPhase('done'), 3500);
     }
   };
 
-  // Auto-record correct answers
+  // Auto-record elke poging (goed én fout) in het streak-systeem
   useEffect(() => {
     if (submitted && isCorrect === true) {
       record(true);
+    } else if (submitted && isCorrect === false) {
+      record(false);
     }
   }, [submitted, isCorrect]);
 
@@ -292,28 +430,46 @@ export default function ExercisePage({ exercise }) {
     recorded.current = false;
     setInputKey(k => k + 1);
     setPhase('hard');
+    // Nieuwe blokken bij overgang naar moeilijker niveau
+    if (isBlockQuestion) {
+      setFreshBlockData(generateFreshBlokkenData(exercise));
+    }
   };
 
   const handleRetry = () => {
     setAnswer('');
     setMathAnswers({});
     setSubmitted(false);
+    recorded.current = false; // Reset zodat volgende poging ook geregistreerd wordt
     setInputKey(k => k + 1);
+
+    // Lees huidig niveau uit progress en pas fase aan
+    const currentProgress = getProgress(exercise.id);
+    const newPhase = (currentProgress.level === 'hard' && hasVariants) ? 'hard' : 'easy';
+    setPhase(newPhase);
+
     if (isMathType) {
-      const data = (phase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data;
+      const data = (newPhase === 'hard' ? hardVariant?.rekensom_data : easyVariant?.rekensom_data) ?? exercise.rekensom_data;
       setCurrentRekensomData(data ? generateFreshRekensomData(data, exercise.question_type, 5) : null);
+    }
+
+    // Genereer vers blokkenbouwsel
+    if (isBlockQuestion) {
+      setFreshBlockData(generateFreshBlokkenData(exercise));
     }
   };
 
   const handleSkip = () => {
     record(false); // opgeven = fout voor streak
-    if (phase === 'easy' && hasVariants) {
+    if (phase === 'easy' && hasVariants && streak.level !== 'easy') {
+      // Medium/hard niveau: ga door naar hard variant
       setAnswer('');
       setMathAnswers({});
       setSubmitted(false);
       setAttempts(0);
       recorded.current = false;
       setPhase('hard');
+      if (isBlockQuestion) setFreshBlockData(generateFreshBlokkenData(exercise));
     } else {
       setPhase('done');
     }
@@ -325,13 +481,8 @@ export default function ExercisePage({ exercise }) {
     setPhase('done');
   };
 
-  // Auto-advance naar moeilijker bij goed antwoord (na 2s)
-  useEffect(() => {
-    if (submitted && isCorrect === true && phase === 'easy' && hasVariants) {
-      const t = setTimeout(handleNextLevel, 2000);
-      return () => clearTimeout(t);
-    }
-  }, [submitted, isCorrect, phase, hasVariants]);
+  // Geen auto-advance meer — leerling kiest zelf via knoppen
+  // (Volgende som / Uitdagingsversie / Afronden)
 
   // ── Math: check of alle verplichte velden ingevuld zijn ──────────────
   const mathAnswersComplete = isMathType && displayRekensomData
@@ -366,6 +517,15 @@ export default function ExercisePage({ exercise }) {
   // ── Input op basis van vraagtype ──────────────────────────────────────
   const renderInput = () => {
 
+    // Wacht op client-side mount voor math-types (voorkomt hydration mismatch door random getallen)
+    if (isMathType && !mounted) {
+      return (
+        <div style={{ padding: 20, textAlign: 'center', color: C.textMid, fontSize: 14 }}>
+          Oefening laden...
+        </div>
+      );
+    }
+
     // ── Vul in: rekensom met lege vakjes ──
     if (exercise.question_type === 'vul_in' && displayRekensomData?.sommen) {
       const sommen = displayRekensomData.sommen;
@@ -376,41 +536,80 @@ export default function ExercisePage({ exercise }) {
             const parts = som.tekst.split('___');
             const userVal = mathAnswers[i] ?? '';
             const isRight = submitted ? Number(userVal) === som.antwoord : null;
+            const hasVerhaal = !!som.verhaal_tekst;
+
             return (
               <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
+                display: 'flex', flexDirection: hasVerhaal ? 'column' : 'row',
+                alignItems: hasVerhaal ? 'stretch' : 'center', gap: hasVerhaal ? 10 : 10,
                 background: submitted ? (isRight ? C.greenLight : C.redLight) : C.bg,
                 border: `1.5px solid ${submitted ? (isRight ? C.green : C.red) : C.border}`,
-                borderRadius: 10, padding: '10px 16px', flexWrap: 'wrap',
+                borderRadius: 10, padding: hasVerhaal ? '14px 16px' : '10px 16px', flexWrap: 'wrap',
               }}>
-                <span style={{ fontSize: 20, fontFamily: 'monospace', fontWeight: 700, color: C.text }}>
-                  {parts[0]}
-                </span>
-                <input
-                  type="number"
-                  value={userVal}
-                  onChange={e => !submitted && setMathAnswers(prev => ({ ...prev, [i]: e.target.value }))}
-                  disabled={submitted}
-                  placeholder="?"
-                  style={{
-                    width: 72, fontSize: 20, fontWeight: 700, textAlign: 'center',
-                    border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
-                    borderRadius: 8, padding: '6px 4px', fontFamily: 'monospace',
-                    color: C.text, background: submitted ? 'transparent' : C.white,
-                  }}
-                />
-                {parts[1] && (
-                  <span style={{ fontSize: 20, fontFamily: 'monospace', fontWeight: 700, color: C.text }}>
-                    {parts[1]}
-                  </span>
-                )}
-                {submitted && !isRight && (
-                  <span style={{ fontSize: 13, color: C.red, fontWeight: 600, marginLeft: 6 }}>
-                    → {som.antwoord}
-                  </span>
-                )}
-                {submitted && isRight && (
-                  <span style={{ fontSize: 16, color: C.green, marginLeft: 6 }}>✓</span>
+                {/* Verhaaltje per som */}
+                {hasVerhaal ? (
+                  <>
+                    <div style={{ fontSize: 15, color: C.text, lineHeight: 1.6 }}>
+                      <span style={{ fontSize: 17, marginRight: 6 }}>📖</span>
+                      {som.verhaal_tekst}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: C.textMid }}>Antwoord:</span>
+                      <input
+                        type="number"
+                        value={userVal}
+                        onChange={e => !submitted && setMathAnswers(prev => ({ ...prev, [i]: e.target.value }))}
+                        disabled={submitted}
+                        placeholder="?"
+                        style={{
+                          width: 80, fontSize: 20, fontWeight: 700, textAlign: 'center',
+                          border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
+                          borderRadius: 8, padding: '6px 4px', fontFamily: 'monospace',
+                          color: C.text, background: submitted ? 'transparent' : C.white,
+                        }}
+                      />
+                      {submitted && !isRight && (
+                        <span style={{ fontSize: 13, color: C.red, fontWeight: 600 }}>
+                          → {som.antwoord}
+                        </span>
+                      )}
+                      {submitted && isRight && (
+                        <span style={{ fontSize: 16, color: C.green }}>✓</span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 20, fontFamily: 'monospace', fontWeight: 700, color: C.text }}>
+                      {parts[0]}
+                    </span>
+                    <input
+                      type="number"
+                      value={userVal}
+                      onChange={e => !submitted && setMathAnswers(prev => ({ ...prev, [i]: e.target.value }))}
+                      disabled={submitted}
+                      placeholder="?"
+                      style={{
+                        width: 72, fontSize: 20, fontWeight: 700, textAlign: 'center',
+                        border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
+                        borderRadius: 8, padding: '6px 4px', fontFamily: 'monospace',
+                        color: C.text, background: submitted ? 'transparent' : C.white,
+                      }}
+                    />
+                    {parts[1] && (
+                      <span style={{ fontSize: 20, fontFamily: 'monospace', fontWeight: 700, color: C.text }}>
+                        {parts[1]}
+                      </span>
+                    )}
+                    {submitted && !isRight && (
+                      <span style={{ fontSize: 13, color: C.red, fontWeight: 600, marginLeft: 6 }}>
+                        → {som.antwoord}
+                      </span>
+                    )}
+                    {submitted && isRight && (
+                      <span style={{ fontSize: 16, color: C.green, marginLeft: 6 }}>✓</span>
+                    )}
+                  </>
                 )}
                 {!submitted && attempts > 0 && <EmojiHint som={som} emoji={emoji} />}
               </div>
@@ -471,73 +670,87 @@ export default function ExercisePage({ exercise }) {
 
     // ── Vermenigvuldig-tabel ──
     if (exercise.question_type === 'vermenigvuldig_tabel' && displayRekensomData?.rijen) {
-      const { operator, factor, rijen } = displayRekensomData;
+      const { operator, factor, rijen, verhaal } = displayRekensomData;
       let blankIndex = 0;
       return (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{
-            borderCollapse: 'separate', borderSpacing: 4,
-            fontFamily: 'monospace', fontSize: 18, fontWeight: 700,
-          }}>
-            <thead>
-              <tr>
-                <td style={{
-                  background: C.purple, color: 'white', textAlign: 'center',
-                  padding: '8px 14px', borderRadius: 6, minWidth: 44,
-                }}>{operator}</td>
-                {rijen.map((r, i) => (
-                  <td key={i} style={{
-                    background: C.purpleLight, color: C.purpleDark, textAlign: 'center',
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Verhaalcontext */}
+          {verhaal && (
+            <div style={{
+              background: '#FFF8E1', border: `1.5px solid #FFD54F`,
+              borderRadius: 10, padding: '10px 14px',
+              fontSize: 14, color: C.text, lineHeight: 1.5,
+            }}>
+              <span style={{ fontSize: 16, marginRight: 6 }}>📖</span>
+              <strong>{verhaal.zin}</strong>
+              {verhaal.vraag && <div style={{ fontSize: 13, color: C.textMid, marginTop: 4 }}>{verhaal.vraag}</div>}
+            </div>
+          )}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{
+              borderCollapse: 'separate', borderSpacing: 4,
+              fontFamily: 'monospace', fontSize: 18, fontWeight: 700,
+            }}>
+              <thead>
+                <tr>
+                  <td style={{
+                    background: C.purple, color: 'white', textAlign: 'center',
                     padding: '8px 14px', borderRadius: 6, minWidth: 44,
-                  }}>{r.getal}</td>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{
-                  background: C.purpleLight, color: C.purpleDark, textAlign: 'center',
-                  padding: '8px 14px', borderRadius: 6,
-                }}>{factor}</td>
-                {rijen.map((r, i) => {
-                  if (r.uitkomst !== null) {
+                  }}>{operator}</td>
+                  {rijen.map((r, i) => (
+                    <td key={i} style={{
+                      background: C.purpleLight, color: C.purpleDark, textAlign: 'center',
+                      padding: '8px 14px', borderRadius: 6, minWidth: 44,
+                    }}>{r.getal}</td>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{
+                    background: C.purpleLight, color: C.purpleDark, textAlign: 'center',
+                    padding: '8px 14px', borderRadius: 6,
+                  }}>{factor}</td>
+                  {rijen.map((r, i) => {
+                    if (r.uitkomst !== null) {
+                      return (
+                        <td key={i} style={{
+                          background: C.bg, color: C.text, textAlign: 'center',
+                          padding: '8px 14px', borderRadius: 6,
+                        }}>{r.uitkomst}</td>
+                      );
+                    }
+                    const idx = blankIndex++;
+                    const userVal = mathAnswers[idx] ?? '';
+                    const isRight = submitted ? Number(userVal) === r.antwoord : null;
                     return (
                       <td key={i} style={{
-                        background: C.bg, color: C.text, textAlign: 'center',
-                        padding: '8px 14px', borderRadius: 6,
-                      }}>{r.uitkomst}</td>
+                        background: submitted ? (isRight ? C.greenLight : C.redLight) : C.white,
+                        border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
+                        borderRadius: 6, textAlign: 'center', padding: 4,
+                      }}>
+                        <input
+                          type="number"
+                          value={userVal}
+                          onChange={e => !submitted && setMathAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
+                          disabled={submitted}
+                          placeholder="?"
+                          style={{
+                            width: 52, fontSize: 18, fontWeight: 700, textAlign: 'center',
+                            border: 'none', background: 'transparent',
+                            fontFamily: 'monospace', color: C.text,
+                          }}
+                        />
+                        {submitted && !isRight && (
+                          <div style={{ fontSize: 11, color: C.red }}>→{r.antwoord}</div>
+                        )}
+                      </td>
                     );
-                  }
-                  const idx = blankIndex++;
-                  const userVal = mathAnswers[idx] ?? '';
-                  const isRight = submitted ? Number(userVal) === r.antwoord : null;
-                  return (
-                    <td key={i} style={{
-                      background: submitted ? (isRight ? C.greenLight : C.redLight) : C.white,
-                      border: `2px solid ${submitted ? (isRight ? C.green : C.red) : C.purple}`,
-                      borderRadius: 6, textAlign: 'center', padding: 4,
-                    }}>
-                      <input
-                        type="number"
-                        value={userVal}
-                        onChange={e => !submitted && setMathAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
-                        disabled={submitted}
-                        placeholder="?"
-                        style={{
-                          width: 52, fontSize: 18, fontWeight: 700, textAlign: 'center',
-                          border: 'none', background: 'transparent',
-                          fontFamily: 'monospace', color: C.text,
-                        }}
-                      />
-                      {submitted && !isRight && (
-                        <div style={{ fontSize: 11, color: C.red }}>→{r.antwoord}</div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            </tbody>
-          </table>
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       );
     }
@@ -590,7 +803,7 @@ export default function ExercisePage({ exercise }) {
 
     if (isBlockQuestion && isTellenMode) {
       const displayGrid = clampGrid(
-        exercise.block_goal_grid || exercise.block_plan_grid || exercise.block_option_a_grid,
+        blockEx.block_goal_grid || blockEx.block_plan_grid || blockEx.block_option_a_grid,
         maxH
       );
       return (
@@ -631,8 +844,8 @@ export default function ExercisePage({ exercise }) {
     }
 
     if (isBlockQuestion && isGoedFoutMode) {
-      const shownGrid = clampGrid(exercise.block_option_a_grid || exercise.block_goal_grid, maxH);
-      const planGrid = clampGrid(exercise.block_plan_grid || exercise.block_goal_grid, maxH);
+      const shownGrid = clampGrid(blockEx.block_option_a_grid || blockEx.block_goal_grid, maxH);
+      const planGrid = clampGrid(blockEx.block_plan_grid || blockEx.block_goal_grid, maxH);
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {shownGrid.length > 0 ? (
@@ -675,7 +888,7 @@ export default function ExercisePage({ exercise }) {
     }
 
     if (isBlockQuestion && isBuildMode) {
-      const targetGrid = clampGrid(exercise.block_goal_grid || exercise.block_plan_grid, maxH);
+      const targetGrid = clampGrid(blockEx.block_goal_grid || blockEx.block_plan_grid, maxH);
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {targetGrid.length > 0 && (
@@ -687,11 +900,12 @@ export default function ExercisePage({ exercise }) {
             </div>
           )}
           <BlokkenBouwselInteractive
-            goalGrid={exercise.block_goal_grid}
-            planGrid={exercise.block_plan_grid}
-            optionAGrid={exercise.block_option_a_grid}
-            optionBGrid={exercise.block_option_b_grid}
-            correctOption={exercise.block_correct_option}
+            key={`blk-build-${inputKey}`}
+            goalGrid={blockEx.block_goal_grid}
+            planGrid={blockEx.block_plan_grid}
+            optionAGrid={blockEx.block_option_a_grid}
+            optionBGrid={blockEx.block_option_b_grid}
+            correctOption={blockEx.block_correct_option}
             maxHeight={maxH}
             onAnswered={(val) => setAnswer(val)}
             disabled={submitted}
@@ -705,11 +919,12 @@ export default function ExercisePage({ exercise }) {
 
     if (isBlockQuestion && isMeerkeuzMode) return (
       <BlokkenBouwselInteractive
-        goalGrid={exercise.block_goal_grid}
-        planGrid={exercise.block_plan_grid}
-        optionAGrid={exercise.block_option_a_grid}
-        optionBGrid={exercise.block_option_b_grid}
-        correctOption={exercise.block_correct_option}
+        key={`blk-mc-${inputKey}`}
+        goalGrid={blockEx.block_goal_grid}
+        planGrid={blockEx.block_plan_grid}
+        optionAGrid={blockEx.block_option_a_grid}
+        optionBGrid={blockEx.block_option_b_grid}
+        correctOption={blockEx.block_correct_option}
         maxHeight={maxH}
         onAnswered={(val) => setAnswer(val)}
         disabled={submitted}
@@ -719,10 +934,10 @@ export default function ExercisePage({ exercise }) {
     );
 
     if (exercise.type === 'Invulvraag') {
-      const blockGrid = exercise.block_goal_grid?.length > 0
-        ? clampGrid(exercise.block_goal_grid, maxH)
-        : exercise.block_plan_grid?.length > 0
-          ? clampGrid(exercise.block_plan_grid, maxH)
+      const blockGrid = blockEx.block_goal_grid?.length > 0
+        ? clampGrid(blockEx.block_goal_grid, maxH)
+        : blockEx.block_plan_grid?.length > 0
+          ? clampGrid(blockEx.block_plan_grid, maxH)
           : null;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -755,10 +970,10 @@ export default function ExercisePage({ exercise }) {
 
     if (exercise.type === 'Open vraag' || exercise.type === 'Tekenopgave'
       || exercise.type === 'Manipulatieopdracht') {
-      const blockGrid = exercise.block_goal_grid?.length > 0
-        ? clampGrid(exercise.block_goal_grid, maxH)
-        : exercise.block_plan_grid?.length > 0
-          ? clampGrid(exercise.block_plan_grid, maxH)
+      const blockGrid = blockEx.block_goal_grid?.length > 0
+        ? clampGrid(blockEx.block_goal_grid, maxH)
+        : blockEx.block_plan_grid?.length > 0
+          ? clampGrid(blockEx.block_plan_grid, maxH)
           : null;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -869,48 +1084,76 @@ export default function ExercisePage({ exercise }) {
           );
         })()}
 
-        {/* Niveau-indicator */}
-        {hasVariants && phase !== 'done' && (
+        {/* Fase-indicator */}
+        {phase !== 'done' && phase === 'hard' && hasVariants && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <div style={{
-              background: phase === 'easy' ? C.greenLight : '#f0f0f0',
-              color: phase === 'easy' ? C.green : C.textLight,
-              border: `1.5px solid ${phase === 'easy' ? C.green : '#ddd'}`,
+              background: C.pinkLight, color: C.pink,
+              border: `1.5px solid ${C.pink}`,
               borderRadius: 99, padding: '5px 16px', fontSize: 12, fontWeight: 700,
-            }}>① Makkelijker</div>
-            <div style={{
-              background: phase === 'hard' ? C.pinkLight : '#f0f0f0',
-              color: phase === 'hard' ? C.pink : C.textLight,
-              border: `1.5px solid ${phase === 'hard' ? C.pink : '#ddd'}`,
-              borderRadius: 99, padding: '5px 16px', fontSize: 12, fontWeight: 700,
-            }}>② Moeilijker</div>
+            }}>Uitdagingsversie</div>
           </div>
         )}
 
-        {/* Streak voortgang */}
+        {/* Streak voortgang — 3 niveaus */}
         {phase !== 'done' && (
-          <div style={{ fontSize: 12, color: C.textMid, marginBottom: 20, display: 'flex', gap: 6, alignItems: 'center' }}>
-            {streak.level === 'easy' ? (
-              <>
-                <span>Niveau: makkelijk</span>
-                <span style={{ color: C.textLight }}>·</span>
-                <span>{streak.correctStreak}/3 goed voor moeilijker</span>
-                {[0, 1, 2].map(i => (
-                  <span key={i} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4,
-                    background: i < streak.correctStreak ? C.green : '#ddd' }} />
-                ))}
-              </>
-            ) : (
-              <>
-                <span style={{ fontWeight: 600 }}>Niveau: moeilijk</span>
-                {streak.incorrectStreak > 0 && (
-                  <>
-                    <span style={{ color: C.textLight }}>·</span>
-                    <span>{streak.incorrectStreak}/2 fout voor makkelijker</span>
-                  </>
-                )}
-              </>
-            )}
+          <div style={{ fontSize: 12, color: C.textMid, marginBottom: 20 }}>
+            {/* Niveau-balk */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 8 }}>
+              {['easy', 'medium', 'hard'].map((lvl, i) => {
+                const labels = { easy: '⭐ Makkelijk', medium: '⭐⭐ Gemiddeld', hard: '⭐⭐⭐ Moeilijk' };
+                const colors = { easy: C.green, medium: C.orange, hard: C.red };
+                const isActive = streak.level === lvl;
+                return (
+                  <div key={lvl} style={{
+                    flex: 1, textAlign: 'center', padding: '6px 8px', borderRadius: 8,
+                    fontSize: 11, fontWeight: isActive ? 800 : 500,
+                    background: isActive ? colors[lvl] + '22' : '#f5f5f5',
+                    border: `2px solid ${isActive ? colors[lvl] : 'transparent'}`,
+                    color: isActive ? colors[lvl] : C.textLight,
+                    transition: 'all 0.3s ease',
+                  }}>
+                    {labels[lvl]}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Streak indicator */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {streak.level !== 'hard' && (
+                <>
+                  <span>{streak.correctStreak}/3 goed voor niveau omhoog</span>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4,
+                      background: i < streak.correctStreak ? C.green : '#ddd',
+                      transition: 'background 0.3s ease' }} />
+                  ))}
+                </>
+              )}
+              {streak.level !== 'easy' && streak.incorrectStreak > 0 && (
+                <>
+                  {streak.level !== 'hard' && <span style={{ color: C.textLight, margin: '0 4px' }}>·</span>}
+                  <span style={{ color: C.red }}>{streak.incorrectStreak}/2 fout voor niveau omlaag</span>
+                  {[0, 1].map(i => (
+                    <span key={i} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4,
+                      background: i < streak.incorrectStreak ? C.red : '#ddd',
+                      transition: 'background 0.3s ease' }} />
+                  ))}
+                </>
+              )}
+              {streak.level === 'hard' && (
+                <>
+                  <span style={{ fontWeight: 600, color: '#F57F17' }}>
+                    {streak.correctStreak}/3 goed voor klaar!
+                  </span>
+                  {[0, 1, 2].map(i => (
+                    <span key={`m${i}`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4,
+                      background: i < streak.correctStreak ? '#FFD600' : '#ddd',
+                      transition: 'background 0.3s ease' }} />
+                  ))}
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -919,37 +1162,106 @@ export default function ExercisePage({ exercise }) {
           <div style={{
             background: levelMsg === 'up' ? C.greenLight : '#FFF3E0',
             border: `1.5px solid ${levelMsg === 'up' ? C.green : '#FF9800'}`,
-            borderRadius: 10, padding: '12px 16px', marginBottom: 20,
-            fontSize: 14, fontWeight: 700, textAlign: 'center',
+            borderRadius: 10, padding: '14px 18px', marginBottom: 20,
+            fontSize: 15, fontWeight: 700, textAlign: 'center',
             color: levelMsg === 'up' ? C.green : '#E65100',
+            animation: 'fadeIn 0.4s ease',
           }}>
             {levelMsg === 'up'
-              ? '⬆ Goed bezig! Je gaat naar moeilijker niveau.'
-              : '⬇ Geen zorgen! Je gaat terug naar het makkelijkere niveau.'}
+              ? streak.level === 'medium'
+                ? '⬆ Goed bezig! Je gaat naar gemiddeld niveau.'
+                : '⬆ Super! Je gaat naar het moeilijkste niveau!'
+              : streak.level === 'medium'
+                ? '⬇ Geen zorgen! Je gaat terug naar gemiddeld niveau.'
+                : '⬇ Geen zorgen! Je gaat terug naar het makkelijke niveau.'}
+          </div>
+        )}
+
+        {/* Mastery melding: 3x goed op hard = klaar! */}
+        {mastered && phase !== 'done' && (
+          <div style={{
+            background: 'linear-gradient(135deg, #FFF8E1, #FFFDE7)',
+            border: '2px solid #FFD600',
+            borderRadius: 14, padding: '20px 24px', marginBottom: 20,
+            textAlign: 'center', animation: 'fadeIn 0.4s ease',
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 6 }}>🏆</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#F57F17' }}>
+              Super gedaan! 3× goed op het moeilijkste niveau!
+            </div>
+            <div style={{ fontSize: 13, color: C.textMid, marginTop: 4 }}>
+              Je gaat zo naar het overzicht...
+            </div>
           </div>
         )}
 
         {/* ── Klaar-scherm ── */}
-        {phase === 'done' ? (
-          <div style={{ background: C.white, borderRadius: 16, padding: 40,
-            textAlign: 'center', border: `1px solid ${C.border}`,
-            boxShadow: '0 4px 24px rgba(109,32,119,0.08)' }}>
-            <div style={{ fontSize: 60, marginBottom: 16 }}>🎉</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.green, marginBottom: 10 }}>
-              Super gedaan!
+        {phase === 'done' ? (() => {
+          // Bepaal volgende oefening:
+          // Prioriteit: zelfde question_type > zelfde topic > volgende in lijst
+          const currentIdx = allExercises.findIndex(e => e.id === exercise.id);
+          const others = allExercises.filter(e => e.id !== exercise.id);
+          const sameQuestionType = others.filter(e => e.question_type === exercise.question_type);
+          const nextInList = currentIdx >= 0 && currentIdx < allExercises.length - 1
+            ? allExercises[currentIdx + 1] : others[0];
+
+          let nextExercise, nextLabel;
+          if (sameQuestionType.length > 0) {
+            nextExercise = sameQuestionType[0];
+            nextLabel = 'Volgende vraag (zelfde type) →';
+          } else if (nextInList) {
+            nextExercise = nextInList;
+            nextLabel = 'Volgende oefening →';
+          } else {
+            nextExercise = null;
+            nextLabel = null;
+          }
+          const nextId = nextExercise?.id || null;
+          return (
+            <div style={{ background: `linear-gradient(135deg, ${C.white}, #F7F2FB)`,
+              borderRadius: 20, padding: '44px 32px',
+              textAlign: 'center', border: `2px solid ${C.green}`,
+              boxShadow: '0 8px 32px rgba(109,32,119,0.12)' }}>
+              <div style={{ fontSize: 72, marginBottom: 12 }}>
+                {mastered ? '🏆' : streak.level === 'hard' ? '⭐' : streak.level === 'medium' ? '🌟' : '🎉'}
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: mastered ? '#F57F17' : C.green, marginBottom: 8 }}>
+                {mastered
+                  ? 'Superknap!'
+                  : ['Geweldig!', 'Super gedaan!', 'Fantastisch!', 'Top!'][Math.floor(Date.now() / 1000) % 4]}
+              </div>
+              <div style={{ fontSize: 16, color: C.textMid, marginBottom: 8, lineHeight: 1.6 }}>
+                {mastered
+                  ? 'Je hebt 3× goed gescoord op het moeilijkste niveau. Knap!'
+                  : streak.level === 'easy'
+                    ? 'Je hebt de oefening afgerond!'
+                    : 'Je hebt alle versies van deze oefening afgerond!'}
+              </div>
+              <div style={{ fontSize: 13, color: C.textLight, marginBottom: 24 }}>
+                Totaal: {streak.totalCorrect} van {streak.totalAttempts} goed
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {nextId && (
+                  <Link href={`/student/${nextId}`}>
+                    <button type="button" style={{ background: C.purple, color: 'white', border: 'none',
+                      borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
+                      cursor: 'pointer' }}>
+                      {nextLabel}
+                    </button>
+                  </Link>
+                )}
+                <Link href="/student">
+                  <button type="button" style={{ background: C.white, color: C.purple,
+                    border: `2px solid ${C.purple}`,
+                    borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
+                    cursor: 'pointer' }}>
+                    ← Terug naar menu
+                  </button>
+                </Link>
+              </div>
             </div>
-            <div style={{ fontSize: 15, color: C.textMid, marginBottom: 28 }}>
-              Je hebt beide niveaus afgerond!
-            </div>
-            <Link href="/student">
-              <button type="button" style={{ background: C.purple, color: 'white', border: 'none',
-                borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15,
-                cursor: 'pointer' }}>
-                Nog een oefening →
-              </button>
-            </Link>
-          </div>
-        ) : (
+          );
+        })() : (
           <div style={{ background: C.white, borderRadius: 16, padding: 28,
             border: `1px solid ${C.border}`, boxShadow: '0 4px 24px rgba(109,32,119,0.08)' }}>
 
@@ -995,47 +1307,139 @@ export default function ExercisePage({ exercise }) {
                             : isGoedFoutMode
                               ? `Niet goed. Het antwoord is: ${goedFoutCorrectAnswer}.`
                               : 'Kijk nog eens goed naar de plattegrond.'
-                        : phase === 'easy' && hasVariants
-                          ? 'Klaar voor de moeilijkere versie?'
+                        : phase === 'easy' && hasVariants && streak.level !== 'easy'
+                          ? 'Goed! Nu de uitdagingsversie van deze oefening.'
                           : 'Je hebt de oefening afgerond!'}
                     </div>
+
+                    {/* Uitleg per som bij fout antwoord */}
+                    {isAnswerCorrect === false && isMathType && displayRekensomData && (
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.red}33` }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.purple, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          💡 Zo doe je het:
+                        </div>
+                        {exercise.question_type === 'vul_in' && displayRekensomData.sommen && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {displayRekensomData.sommen.map((som, i) => {
+                              if (Number(mathAnswers[i]) === som.antwoord) return null; // skip goed beantwoorde
+                              const uitleg = generateUitleg(som, 'vul_in');
+                              if (!uitleg) return null;
+                              return (
+                                <div key={i} style={{ fontSize: 13, color: C.text, lineHeight: 1.5,
+                                  background: '#fff', borderRadius: 8, padding: '8px 12px',
+                                  border: `1px solid ${C.border}` }}>
+                                  {uitleg}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {exercise.question_type === 'goed_fout' && displayRekensomData.stellingen && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {displayRekensomData.stellingen.map((stelling, i) => {
+                              const correctAns = stelling.klopt ? 'Goed' : 'Fout';
+                              if (mathAnswers[i] === correctAns) return null;
+                              const uitleg = generateUitleg(stelling, 'goed_fout');
+                              if (!uitleg) return null;
+                              return (
+                                <div key={i} style={{ fontSize: 13, color: C.text, lineHeight: 1.5,
+                                  background: '#fff', borderRadius: 8, padding: '8px 12px',
+                                  border: `1px solid ${C.border}` }}>
+                                  {uitleg}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {exercise.question_type === 'geld_tellen' && (() => {
+                          const geldData = displayRekensomData ?? exercise.rekensom_data;
+                          const uitleg = generateGeldUitleg(geldData);
+                          if (!uitleg) return null;
+                          return (
+                            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5,
+                              background: '#fff', borderRadius: 8, padding: '8px 12px',
+                              border: `1px solid ${C.border}` }}>
+                              {uitleg}
+                            </div>
+                          );
+                        })()}
+                        {exercise.question_type === 'getallenlijn' && displayRekensomData?.te_plaatsen && (() => {
+                          const stap = displayRekensomData.stap ?? 1;
+                          const lijnMin = displayRekensomData.lijn_min ?? 0;
+                          const lijnMax = displayRekensomData.lijn_max ?? 1000;
+                          const gegeven = [...(displayRekensomData.gegeven_getallen ?? [lijnMin, lijnMax])].sort((a, b) => a - b);
+                          const fout = displayRekensomData.te_plaatsen.filter(pos => Number(mathAnswers[pos]) !== pos);
+                          if (fout.length === 0) return null;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {fout.map(pos => {
+                                // Vind de twee dichtstbijzijnde ankerpunten (zichtbare labels op de lijn)
+                                let lower = gegeven[0], upper = gegeven[gegeven.length - 1];
+                                for (let i = 0; i < gegeven.length - 1; i++) {
+                                  if (pos >= gegeven[i] && pos <= gegeven[i + 1]) {
+                                    lower = gegeven[i];
+                                    upper = gegeven[i + 1];
+                                    break;
+                                  }
+                                }
+                                const verschil = pos - lower;
+                                const bereik = upper - lower;
+                                const fraction = bereik > 0 ? verschil / bereik : 0;
+                                const aantalStreepjes = stap > 0 ? Math.round(verschil / stap) : 0;
+
+                                // Kindvriendelijke positiebeschrijving
+                                let waar;
+                                if (fraction <= 0.15) waar = `heel dicht bij ${lower}`;
+                                else if (fraction >= 0.45 && fraction <= 0.55) waar = `halverwege ${lower} en ${upper}`;
+                                else if (fraction >= 0.85) waar = `bijna bij ${upper}`;
+                                else if (fraction < 0.5) waar = `tussen ${lower} en het midden`;
+                                else waar = `voorbij het midden, richting ${upper}`;
+
+                                // Tel-hint (alleen als het niet te veel streepjes zijn)
+                                const telTekst = aantalStreepjes > 0 && aantalStreepjes <= 10
+                                  ? ` Tel ${aantalStreepjes} streepje${aantalStreepjes !== 1 ? 's' : ''} vanaf ${lower}.`
+                                  : '';
+
+                                return (
+                                  <div key={pos} style={{ fontSize: 13, color: C.text, lineHeight: 1.6,
+                                    background: '#fff', borderRadius: 8, padding: '8px 12px',
+                                    border: `1px solid ${C.border}` }}>
+                                    <strong>{pos}</strong> ligt tussen <strong>{lower}</strong> en <strong>{upper}</strong>.
+                                    {` Het is ${verschil} meer dan ${lower} — dat is ${waar}.${telTekst}`}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {phase === 'easy' && hasVariants && (
-                  isAnswerCorrect === false && isMathType ? (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: isBuildMode ? 12 : 0 }}>
+                  {isAnswerCorrect === false && (isMathType || isBlockQuestion) && (
                     <button type="button" onClick={handleRetry}
                       style={{ background: C.purple, color: 'white', border: 'none',
                         borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                      ← Probeer opnieuw met nieuwe sommen
+                      ← Probeer opnieuw
                     </button>
-                  ) : (
-                    <button type="button" onClick={handleNextLevel}
-                      style={{ background: `linear-gradient(135deg, ${C.pink}, #A0004A)`,
-                        color: 'white', border: 'none', borderRadius: 10,
-                        padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                      Moeilijkere versie proberen →
+                  )}
+                  {isAnswerCorrect === true && (isMathType || isBlockQuestion) && (
+                    <button type="button" onClick={handleRetry}
+                      style={{ background: C.purple, color: 'white', border: 'none',
+                        borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                      {isBlockQuestion ? 'Volgende opdracht →' : 'Volgende som →'}
                     </button>
-                  )
-                )}
-
-                {phase === 'hard' && (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: isBuildMode ? 12 : 0 }}>
-                    {isAnswerCorrect === false && isMathType && (
-                      <button type="button" onClick={handleRetry}
-                        style={{ background: C.purple, color: 'white', border: 'none',
-                          borderRadius: 10, padding: '13px 32px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                        ← Probeer opnieuw
-                      </button>
-                    )}
-                    <button type="button" onClick={handleDone}
-                      style={{ background: C.green, color: 'white', border: 'none',
-                        borderRadius: 10, padding: '13px 32px', fontWeight: 700,
-                        fontSize: 15, cursor: 'pointer' }}>
-                      🎉 Afronden
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button type="button" onClick={handleDone}
+                    style={{ background: C.white, color: C.purple,
+                      border: `2px solid ${C.purple}`,
+                      borderRadius: 10, padding: '13px 32px', fontWeight: 700,
+                      fontSize: 15, cursor: 'pointer' }}>
+                    Afronden
+                  </button>
+                </div>
               </div>
             )}
           </div>

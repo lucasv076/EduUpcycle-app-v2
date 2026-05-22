@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { getAllExercises } from '@/lib/supabase';
 import { C, TYPE_COLORS } from '@/lib/colors';
+import StudentProgress from '@/components/StudentProgress';
 
 const ZwijsenLogo = () => (
   <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -44,9 +45,12 @@ export default async function StudentListPage() {
         <h1 style={{ fontSize: 24, fontWeight: 800, color: C.purple, marginBottom: 6 }}>
           Kies een oefening
         </h1>
-        <p style={{ color: C.textMid, fontSize: 14, marginBottom: 28 }}>
+        <p style={{ color: C.textMid, fontSize: 14, marginBottom: 16 }}>
           Klik op een oefening om te beginnen. Elke oefening heeft een makkelijke en een moeilijkere versie.
         </p>
+
+        {/* Voortgang-balk (client component, leest localStorage) */}
+        <StudentProgress />
 
         {/* Foutmelding als Supabase niet werkt */}
         {dbError && (

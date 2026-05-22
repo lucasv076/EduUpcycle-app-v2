@@ -41,6 +41,49 @@ function rangeFromSommen(sommen) {
   return { lo: Math.max(1, Math.min(...nums)), hi: Math.max(...nums) };
 }
 
+// ── Verhaal-contexten voor tafelsommen ──────────────────────────────
+const VERHAAL_KEER = [
+  { zin: 'In elke zak zitten {f} knikkers.',     tel: 'Er zijn {n} zakken.',                      vraag: 'Hoeveel knikkers zijn er in totaal?' },
+  { zin: 'In elke doos zitten {f} koekjes.',      tel: 'De bakker heeft {n} dozen.',                vraag: 'Hoeveel koekjes heeft de bakker?' },
+  { zin: 'Elk kind krijgt {f} snoepjes.',         tel: 'Er zijn {n} kinderen op het feestje.',      vraag: 'Hoeveel snoepjes zijn er nodig?' },
+  { zin: 'Bij elke tafel staan {f} stoelen.',     tel: 'In het restaurant staan {n} tafels.',       vraag: 'Hoeveel stoelen staan er in het restaurant?' },
+  { zin: 'In elke vaas staan {f} bloemen.',       tel: 'Oma heeft {n} vazen.',                      vraag: 'Hoeveel bloemen heeft oma in totaal?' },
+  { zin: 'In elk nest liggen {f} eieren.',        tel: 'Het kippenhok heeft {n} nesten.',            vraag: 'Hoeveel eieren liggen er in het kippenhok?' },
+  { zin: 'Op elk bord liggen {f} pannenkoeken.',  tel: 'Er staan {n} borden op tafel.',              vraag: 'Hoeveel pannenkoeken zijn er in totaal?' },
+  { zin: 'In elk mandje zitten {f} appels.',      tel: 'De fruitkraam heeft {n} mandjes.',           vraag: 'Hoeveel appels heeft de fruitkraam?' },
+  { zin: 'In elk aquarium zwemmen {f} vissen.',   tel: 'De dierenwinkel heeft {n} aquariums.',       vraag: 'Hoeveel vissen zijn er in de dierenwinkel?' },
+  { zin: 'Elk groepje krijgt {f} potloden.',      tel: 'De juf heeft {n} groepjes gemaakt.',         vraag: 'Hoeveel potloden heeft de juf nodig?' },
+  { zin: 'In elk team zitten {f} spelers.',       tel: 'Er doen {n} teams mee aan het toernooi.',    vraag: 'Hoeveel spelers doen er mee?' },
+  { zin: 'In elke rij staan {f} boompjes.',       tel: 'De tuinman heeft {n} rijen geplant.',        vraag: 'Hoeveel boompjes heeft de tuinman geplant?' },
+  { zin: 'Op elke plank liggen {f} boeken.',      tel: 'De boekenkast heeft {n} planken.',           vraag: 'Hoeveel boeken staan er in de kast?' },
+  { zin: 'Elke leerling heeft {f} stiften.',      tel: 'Er zitten {n} leerlingen in de klas.',       vraag: 'Hoeveel stiften zijn er in de klas?' },
+  { zin: 'In elke garage staan {f} fietsen.',     tel: 'In de straat zijn {n} garages.',              vraag: 'Hoeveel fietsen staan er in de straat?' },
+];
+
+const VERHAAL_PLUS = [
+  { zin: 'Je hebt een aantal punten en scoort er {f} bij. Hoeveel heb je dan?' },
+  { zin: 'Je hebt een aantal stickers en krijgt er {f} bij.' },
+  { zin: 'Er komen {f} kinderen bij in de klas. Hoeveel zijn er nu?' },
+];
+
+const VERHAAL_MIN = [
+  { zin: 'Je hebt een aantal snoepjes en geeft er {f} weg. Hoeveel houd je over?' },
+  { zin: 'Er gaan {f} vogels weg. Hoeveel blijven er zitten?' },
+  { zin: 'Je verliest {f} knikkers. Hoeveel heb je nog?' },
+];
+
+function pickVerhaal(factor, operator) {
+  const pool = operator === '×' ? VERHAAL_KEER
+    : operator === '+' ? VERHAAL_PLUS
+    : operator === '−' ? VERHAAL_MIN
+    : null;
+  if (!pool?.length) return null;
+  const v = pool[Math.floor(Math.random() * pool.length)];
+  const zin = v.zin.replace('{f}', factor);
+  const vraag = v.vraag || null;
+  return { zin, vraag };
+}
+
 // bereikMax = highest number allowed in the som (set by AI, e.g. 10 for "tot 10")
 function makeSom(bewerking, lo, bereikMax) {
   let a, b, antwoord, tekst;
@@ -83,6 +126,47 @@ function makeSom(bewerking, lo, bereikMax) {
   return { tekst, antwoord, bewerking };
 }
 
+// Speciale case: tafel-oefening (alle sommen zijn × met dezelfde factor)
+function freshTafelVulIn(data, count) {
+  // Kies een willekeurige tafel (2-10)
+  const allFactors = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const factor = allFactors[Math.floor(Math.random() * allFactors.length)];
+
+  // Shuffle verhaal-templates zodat elke som een ander verhaaltje krijgt
+  const shuffled = [...VERHAAL_KEER].sort(() => Math.random() - 0.5);
+
+  const used = new Set();
+  const result = [];
+  let attempts = count * 20;
+  let tplIdx = 0;
+
+  while (result.length < count && attempts-- > 0) {
+    const n = rand(1, 10);
+    if (used.has(n)) continue;
+    used.add(n);
+    const antwoord = factor * n;
+
+    // Bouw verhaaltje: "In elk nest liggen 7 eieren. Het kippenhok heeft 3 nesten. Hoeveel eieren liggen er in het kippenhok?"
+    const tpl = shuffled[tplIdx % shuffled.length];
+    tplIdx++;
+    const verhaalTekst = tpl.zin.replace('{f}', factor) + ' '
+      + tpl.tel.replace('{n}', n) + ' '
+      + tpl.vraag;
+
+    result.push({
+      tekst: `${factor} × ${n} = ___`,
+      verhaal_tekst: verhaalTekst,
+      antwoord,
+      bewerking: 'vermenigvuldigen',
+    });
+  }
+
+  result.sort((a, b) => a.antwoord - b.antwoord);
+
+  const thema = data.thema || randomThema();
+  return { ...data, thema, sommen: result };
+}
+
 function freshVulIn(data, count) {
   const sommen = data.sommen || [];
   if (!sommen.length) return data;
@@ -90,6 +174,11 @@ function freshVulIn(data, count) {
   const freq = {};
   sommen.forEach(s => { freq[s.bewerking] = (freq[s.bewerking] || 0) + 1; });
   const bewerkingen = Object.keys(freq);
+
+  // Tafel-detectie: als alle sommen vermenigvuldigingen zijn → speciale tafel-generator
+  if (bewerkingen.length === 1 && bewerkingen[0] === 'vermenigvuldigen') {
+    return freshTafelVulIn(data, count);
+  }
 
   // Use AI-provided range; fall back to derived range only if not set
   const derived = rangeFromSommen(sommen);
@@ -190,36 +279,41 @@ function freshGoedFout(data, count) {
 }
 
 function freshTabel(data, count) {
-  const { operator, factor, rijen } = data;
-  if (!rijen?.length || !factor) return data;
+  const { operator, factor: origFactor, rijen } = data;
+  if (!rijen?.length || !origFactor) return data;
 
-  const getallen = rijen.map(r => r.getal).filter(n => typeof n === 'number');
-  const lo = getallen.length ? Math.max(1, Math.min(...getallen)) : 1;
-  const hi = Math.max(lo + count, getallen.length ? Math.max(...getallen) + 2 : 10);
+  // ALTIJD een andere factor dan het origineel — garandeert variatie
+  const allFactors = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const pool = allFactors.filter(f => f !== origFactor);
+  const newFactor = pool[Math.floor(Math.random() * pool.length)];
 
+  // Brede range getallen (1-12) voor afwisseling
   const newGetallen = new Set();
   let attempts = count * 30;
-  while (newGetallen.size < count && attempts-- > 0) newGetallen.add(rand(lo, hi));
+  while (newGetallen.size < count && attempts-- > 0) newGetallen.add(rand(1, 12));
 
   const blankFrac = rijen.length ? rijen.filter(r => r.uitkomst === null).length / rijen.length : 0.6;
 
-  const newRijen = [...newGetallen].map(getal => {
+  const newRijen = [...newGetallen].sort((a, b) => a - b).map(getal => {
     let antwoord;
-    if (operator === '×') antwoord = getal * factor;
-    else if (operator === '+') antwoord = getal + factor;
-    else if (operator === '−') antwoord = getal - factor;
+    if (operator === '×') antwoord = getal * newFactor;
+    else if (operator === '+') antwoord = getal + newFactor;
+    else if (operator === '−') antwoord = getal - newFactor;
     else antwoord = getal;
 
     const isBlank = Math.random() < Math.max(0.4, blankFrac);
     return { getal, uitkomst: isBlank ? null : antwoord, antwoord };
   });
 
-  // Guarantee at least one blank and one shown
+  // Minstens 1 leeg en 1 gevuld
   const blanks = newRijen.filter(r => r.uitkomst === null);
   if (blanks.length === 0) newRijen[0].uitkomst = null;
   if (blanks.length === newRijen.length) newRijen[0].uitkomst = newRijen[0].antwoord;
 
-  return { ...data, rijen: newRijen };
+  // Verhaalcontext
+  const verhaal = pickVerhaal(newFactor, operator);
+
+  return { ...data, factor: newFactor, rijen: newRijen, verhaal };
 }
 
 function freshGetallenLijn(data) {
@@ -395,6 +489,64 @@ function freshTafelSpin(data, count = 5) {
   return vragen.length >= count
     ? { ...data, tafel_vraag_type: tvt, vragen }
     : data;
+}
+
+// Genereer een nieuw willekeurig blokkenbouwsel op basis van de bestaande afmetingen
+export function generateFreshBlokkenData(exercise) {
+  const planGrid = exercise.block_plan_grid || exercise.block_goal_grid;
+  if (!planGrid?.length) return null;
+
+  const rows = planGrid.length;
+  const cols = planGrid[0]?.length || 0;
+  if (!cols) return null;
+  const maxH = exercise.block_max_height || 5;
+  const effectiveMax = Math.min(maxH, 4); // Hou het overzichtelijk
+
+  // Nieuw willekeurig plattegrond
+  const newPlan = [];
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      row.push(Math.random() < 0.25 ? 0 : rand(1, effectiveMax));
+    }
+    newPlan.push(row);
+  }
+
+  // Minstens 2 gevulde cellen
+  const nonZero = newPlan.flat().filter(h => h > 0).length;
+  if (nonZero < 2) {
+    newPlan[0][0] = rand(1, effectiveMax);
+    if (cols > 1) newPlan[0][1] = rand(1, effectiveMax);
+    else if (rows > 1) newPlan[1][0] = rand(1, effectiveMax);
+  }
+
+  // Fout-optie: wijzig 1-2 cellen
+  const wrongPlan = newPlan.map(r => [...r]);
+  let changes = 0;
+  const targetChanges = rand(1, 2);
+  attempts = 50;
+  while (changes < targetChanges && attempts-- > 0) {
+    const r = rand(0, rows - 1);
+    const c = rand(0, cols - 1);
+    const delta = Math.random() > 0.5 ? 1 : -1;
+    const newVal = Math.max(0, Math.min(maxH, wrongPlan[r][c] + delta));
+    if (newVal !== wrongPlan[r][c]) {
+      wrongPlan[r][c] = newVal;
+      changes++;
+    }
+  }
+
+  const correctIsA = Math.random() > 0.5;
+
+  return {
+    block_goal_grid: newPlan,
+    block_plan_grid: newPlan,
+    block_option_a_grid: correctIsA ? newPlan : wrongPlan,
+    block_option_b_grid: correctIsA ? wrongPlan : newPlan,
+    block_correct_option: correctIsA ? 'A' : 'B',
+    block_answer_grid: newPlan,
+    block_max_height: maxH,
+  };
 }
 
 export function generateFreshRekensomData(rekensomData, questionType, count = 5) {
