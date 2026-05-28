@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IBR Installatie – Installatie Bureau Rucphen</title>
+  <meta name="description" content="IBR Installatie Rucphen – uw betrouwbare partner voor nieuwbouw, renovatie en duurzame installaties sinds 1999." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blauw: #1B6BB5;
+      --rood:  #C0272D;
+      --groen: #3A9A3E;
+      --grijs: #6B6B6B;
+      --lichtgrijs: #F4F4F4;
+      --donker: #222222;
+      --wit: #FFFFFF;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: var(--donker);
+      background: var(--wit);
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: var(--wit);
+      box-shadow: 0 2px 8px rgba(0,0,0,.10);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 5%;
+      height: 70px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    /* Diamond logo made of 4 rotated squares */
+    .diamond-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+      width: 46px;
+      height: 46px;
+      transform: rotate(45deg);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .diamond-grid span { display: block; }
+    .d-blue  { background: var(--blauw); }
+    .d-red   { background: var(--rood); }
+    .d-white { background: #CCC; }
+    .d-green { background: var(--groen); }
+
+    .logo-text { line-height: 1; }
+    .logo-text strong {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--grijs);
+      letter-spacing: 2px;
+    }
+    .logo-text span {
+      display: block;
+      font-size: .6rem;
+      letter-spacing: 3px;
+      color: var(--grijs);
+      text-transform: uppercase;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      text-decoration: none;
+      color: var(--grijs);
+      font-size: .9rem;
+      font-weight: 500;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--blauw); }
+
+    .nav-cta {
+      background: var(--blauw);
+      color: var(--wit) !important;
+      padding: 8px 18px;
+      border-radius: 4px;
+      transition: background .2s !important;
+    }
+    .nav-cta:hover { background: #155a9a !important; color: var(--wit) !important; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      padding-top: 70px;
+      display: flex;
+      align-items: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* decorative diamonds */
+    .hero::before {
+      content: '';
+      position: absolute;
+      right: -100px; top: -100px;
+      width: 500px; height: 500px;
+      background: linear-gradient(135deg, var(--blauw), var(--groen));
+      transform: rotate(45deg);
+      opacity: .12;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      right: 80px; bottom: -120px;
+      width: 360px; height: 360px;
+      background: linear-gradient(135deg, var(--rood), var(--blauw));
+      transform: rotate(45deg);
+      opacity: .10;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 5%;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,.1);
+      color: rgba(255,255,255,.8);
+      font-size: .8rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.2);
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      font-weight: 800;
+      color: var(--wit);
+      line-height: 1.15;
+      margin-bottom: 20px;
+      max-width: 700px;
+    }
+    .hero h1 .accent { color: var(--blauw); }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: rgba(255,255,255,.75);
+      max-width: 560px;
+      line-height: 1.7;
+      margin-bottom: 36px;
+    }
+
+    .hero-btns {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: var(--blauw);
+      color: var(--wit);
+      padding: 14px 30px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background .2s, transform .15s;
+    }
+    .btn-primary:hover { background: #155a9a; transform: translateY(-2px); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--wit);
+      padding: 14px 30px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      border: 2px solid rgba(255,255,255,.35);
+      transition: border-color .2s, transform .15s;
+    }
+    .btn-outline:hover { border-color: var(--wit); transform: translateY(-2px); }
+
+    .hero-stats {
+      display: flex;
+      gap: 40px;
+      margin-top: 60px;
+      flex-wrap: wrap;
+    }
+    .stat { text-align: left; }
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--wit);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: .8rem;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    /* ── SECTION COMMON ── */
+    section { padding: 90px 5%; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+
+    .section-label {
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--blauw);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 3vw, 2.5rem);
+      font-weight: 800;
+      color: var(--donker);
+      line-height: 1.2;
+      margin-bottom: 18px;
+    }
+
+    .section-sub {
+      font-size: 1rem;
+      color: var(--grijs);
+      max-width: 560px;
+      line-height: 1.7;
+      margin-bottom: 48px;
+    }
+
+    /* ── OVER ONS ── */
+    .over-ons { background: var(--lichtgrijs); }
+
+    .over-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .over-img {
+      position: relative;
+    }
+
+    .over-img-box {
+      background: linear-gradient(135deg, var(--blauw) 0%, #0f3460 100%);
+      border-radius: 12px;
+      aspect-ratio: 4/3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* decorative big diamond in image box */
+    .big-diamond {
+      width: 180px; height: 180px;
+      position: relative;
+    }
+    .big-diamond-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      width: 180px; height: 180px;
+      transform: rotate(45deg);
+    }
+    .big-diamond-grid span { display: block; border-radius: 4px; }
+
+    .over-badge {
+      position: absolute;
+      bottom: -20px; right: -20px;
+      background: var(--wit);
+      border-radius: 10px;
+      padding: 18px 22px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.12);
+      text-align: center;
+    }
+    .over-badge strong {
+      display: block;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--blauw);
+    }
+    .over-badge span { font-size: .8rem; color: var(--grijs); }
+
+    .over-content .check-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .over-content .check-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: .95rem;
+      color: var(--grijs);
+    }
+    .check-icon {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--blauw);
+      color: var(--wit);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .7rem;
+      flex-shrink: 0;
+    }
+
+    /* ── DIENSTEN ── */
+    .diensten-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+
+    .dienst-card {
+      background: var(--wit);
+      border-radius: 12px;
+      padding: 36px 28px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.06);
+      border-top: 4px solid transparent;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .dienst-card:hover { transform: translateY(-6px); box-shadow: 0 12px 36px rgba(0,0,0,.10); }
+    .dienst-card.blauw  { border-top-color: var(--blauw); }
+    .dienst-card.rood   { border-top-color: var(--rood); }
+    .dienst-card.groen  { border-top-color: var(--groen); }
+
+    .dienst-icon {
+      width: 52px; height: 52px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+    .dienst-icon.blauw { background: rgba(27,107,181,.12); }
+    .dienst-icon.rood  { background: rgba(192,39,45,.12); }
+    .dienst-icon.groen { background: rgba(58,154,62,.12); }
+
+    .dienst-card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--donker);
+    }
+    .dienst-card p {
+      font-size: .9rem;
+      color: var(--grijs);
+      line-height: 1.65;
+    }
+
+    /* ── KLANTEN ── */
+    .klanten { background: var(--lichtgrijs); }
+
+    .klanten-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .klant-card {
+      background: var(--wit);
+      border-radius: 10px;
+      padding: 24px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    }
+
+    .klant-icon {
+      font-size: 1.8rem;
+      width: 48px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .klant-card h4 { font-size: .95rem; font-weight: 700; color: var(--donker); }
+    .klant-card p  { font-size: .8rem; color: var(--grijs); margin-top: 3px; }
+
+    /* ── DUURZAAMHEID BANNER ── */
+    .duurzaam-banner {
+      background: linear-gradient(135deg, var(--groen), #1e5e22);
+      padding: 70px 5%;
+    }
+    .duurzaam-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+    .duurzaam-inner h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      color: var(--wit);
+      max-width: 500px;
+      line-height: 1.3;
+    }
+    .duurzaam-inner p {
+      color: rgba(255,255,255,.8);
+      margin-top: 10px;
+      font-size: .95rem;
+      max-width: 460px;
+      line-height: 1.6;
+    }
+    .btn-white {
+      background: var(--wit);
+      color: var(--groen);
+      padding: 14px 30px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: .95rem;
+      white-space: nowrap;
+      transition: transform .15s;
+      flex-shrink: 0;
+    }
+    .btn-white:hover { transform: translateY(-2px); }
+
+    /* ── CONTACT ── */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: start;
+    }
+
+    .contact-info h2 {
+      font-size: clamp(1.8rem, 3vw, 2.5rem);
+      font-weight: 800;
+      color: var(--donker);
+      margin-bottom: 16px;
+    }
+    .contact-info p {
+      color: var(--grijs);
+      font-size: .95rem;
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    .contact-items { display: flex; flex-direction: column; gap: 20px; }
+
+    .contact-item {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .contact-item-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      background: rgba(27,107,181,.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .contact-item-text strong {
+      display: block;
+      font-size: .85rem;
+      color: var(--donker);
+      font-weight: 700;
+    }
+    .contact-item-text span {
+      font-size: .9rem;
+      color: var(--grijs);
+    }
+    .contact-item-text a { color: var(--blauw); text-decoration: none; }
+    .contact-item-text a:hover { text-decoration: underline; }
+
+    /* Form */
+    .contact-form {
+      background: var(--lichtgrijs);
+      border-radius: 16px;
+      padding: 40px;
+    }
+    .contact-form h3 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 24px;
+      color: var(--donker);
+    }
+
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--grijs);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #E0E0E0;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-family: inherit;
+      color: var(--donker);
+      background: var(--wit);
+      transition: border-color .2s;
+      outline: none;
+      resize: vertical;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus { border-color: var(--blauw); }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .form-submit {
+      width: 100%;
+      background: var(--blauw);
+      color: var(--wit);
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+      margin-top: 8px;
+    }
+    .form-submit:hover { background: #155a9a; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #1a1a2e;
+      color: rgba(255,255,255,.6);
+      padding: 60px 5% 30px;
+    }
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .footer-top {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 48px;
+      padding-bottom: 40px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      margin-bottom: 30px;
+    }
+    .footer-brand p {
+      font-size: .9rem;
+      line-height: 1.7;
+      margin-top: 16px;
+      max-width: 300px;
+    }
+    .footer-col h4 {
+      color: var(--wit);
+      font-size: .9rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col ul a {
+      text-decoration: none;
+      color: rgba(255,255,255,.55);
+      font-size: .9rem;
+      transition: color .2s;
+    }
+    .footer-col ul a:hover { color: var(--wit); }
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .8rem;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .footer-bottom a { color: rgba(255,255,255,.55); text-decoration: none; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .nav-links { display: none; }
+      .over-grid,
+      .contact-grid { grid-template-columns: 1fr; }
+      .diensten-grid { grid-template-columns: 1fr; }
+      .klanten-grid { grid-template-columns: 1fr 1fr; }
+      .footer-top { grid-template-columns: 1fr 1fr; }
+      .footer-brand { grid-column: 1 / -1; }
+      .over-badge { bottom: 10px; right: 10px; }
+    }
+
+    @media (max-width: 600px) {
+      .klanten-grid { grid-template-columns: 1fr; }
+      .footer-top { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .hero-stats { gap: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="#" class="logo">
+      <div class="diamond-grid">
+        <span class="d-blue"></span>
+        <span class="d-red"></span>
+        <span class="d-white"></span>
+        <span class="d-green"></span>
+      </div>
+      <div class="logo-text">
+        <strong>IBR</strong>
+        <span>Installatie</span>
+      </div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#over">Over ons</a></li>
+      <li><a href="#diensten">Diensten</a></li>
+      <li><a href="#duurzaamheid">Duurzaamheid</a></li>
+      <li><a href="#contact">Contact</a></li>
+      <li><a href="#vacatures">Vacatures</a></li>
+      <li><a href="#contact" class="nav-cta">Offerte aanvragen</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="hero-badge">Installatiebedrijf Rucphen · Sinds 1999</p>
+      <h1>Uw betrouwbare <span class="accent">installatiepartner</span> in de regio</h1>
+      <p>IBR Installatie is dé specialist in Rucphen voor elektra, sanitair en duurzame installaties — voor nieuwbouw, renovatie en utiliteit.</p>
+      <div class="hero-btns">
+        <a href="#contact" class="btn-primary">Offerte aanvragen</a>
+        <a href="#diensten" class="btn-outline">Bekijk onze diensten</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-num">25+</div>
+          <div class="stat-label">Jaar ervaring</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">500+</div>
+          <div class="stat-label">Afgeronde projecten</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">100%</div>
+          <div class="stat-label">Klantgericht</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OVER ONS -->
+  <section class="over-ons" id="over">
+    <div class="section-inner over-grid">
+      <div class="over-img">
+        <div class="over-img-box">
+          <div class="big-diamond">
+            <div class="big-diamond-grid">
+              <span class="d-blue"></span>
+              <span class="d-red"></span>
+              <span class="d-white"></span>
+              <span class="d-green"></span>
+            </div>
+          </div>
+        </div>
+        <div class="over-badge">
+          <strong>1999</strong>
+          <span>Opgericht</span>
+        </div>
+      </div>
+      <div class="over-content">
+        <p class="section-label">Over IBR Installatie</p>
+        <h2 class="section-title">Een begrip in de regio Rucphen</h2>
+        <p style="color:#6B6B6B;font-size:.95rem;line-height:1.7;margin-bottom:24px;">
+          Installatie Bureau Rucphen bestaat sinds 1999 en is uitgegroeid tot een begrip in de regio. Als installatiebedrijf zijn wij een goede partner in klantgerichte en servicegerichte zaken — voor utiliteit, woningbouwverenigingen, bedrijven, scholen, verenigingen en particulieren.
+        </p>
+        <ul class="check-list">
+          <li><div class="check-icon">✓</div> Erkend en gecertificeerd installatiebedrijf</li>
+          <li><div class="check-icon">✓</div> Lokale kennis, snelle service in de regio</li>
+          <li><div class="check-icon">✓</div> Van advies tot oplevering: alles onder één dak</li>
+          <li><div class="check-icon">✓</div> Specialist in duurzame energie-installaties</li>
+          <li><div class="check-icon">✓</div> Transparante tarieven, eerlijk advies</li>
+        </ul>
+        <a href="#contact" class="btn-primary">Neem contact op</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIENSTEN -->
+  <section id="diensten">
+    <div class="section-inner">
+      <p class="section-label">Wat wij doen</p>
+      <h2 class="section-title">Onze diensten</h2>
+      <p class="section-sub">Van nieuwbouwproject tot renovatie — IBR regelt de complete installatie vakkundig en betrouwbaar.</p>
+      <div class="diensten-grid">
+        <div class="dienst-card blauw">
+          <div class="dienst-icon blauw">🏗️</div>
+          <h3>Nieuwbouwwoningen & utiliteit</h3>
+          <p>Complete elektra- en installatiewerkzaamheden voor nieuwbouwprojecten, utiliteitsgebouwen en woningbouwverenigingen. Van tekening tot oplevering.</p>
+        </div>
+        <div class="dienst-card rood">
+          <div class="dienst-icon rood">🔧</div>
+          <h3>Renovatie & verbouwing</h3>
+          <p>Modernisering van bestaande installaties bij renovaties en verbouwingen. Wij werken netjes, snel en met minimale overlast voor bewoners en gebruikers.</p>
+        </div>
+        <div class="dienst-card groen">
+          <div class="dienst-icon groen">♻️</div>
+          <h3>Duurzaamheid</h3>
+          <p>Warmtepompen, zonnepanelen, laadpalen en energiezuinige installaties. Wij helpen u stap voor stap naar een duurzamere woning of gebouw.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KLANTEN -->
+  <section class="klanten">
+    <div class="section-inner">
+      <p class="section-label">Wie wij bedienen</p>
+      <h2 class="section-title">Voor iedereen in de regio</h2>
+      <p class="section-sub">Of u nu particulier bent of een grote instelling — IBR Installatie staat voor u klaar.</p>
+      <div class="klanten-grid">
+        <div class="klant-card">
+          <div class="klant-icon">🏠</div>
+          <div>
+            <h4>Particulieren</h4>
+            <p>Thuis alles goed geregeld</p>
+          </div>
+        </div>
+        <div class="klant-card">
+          <div class="klant-icon">🏢</div>
+          <div>
+            <h4>Bedrijven</h4>
+            <p>Betrouwbare bedrijfsinstallaties</p>
+          </div>
+        </div>
+        <div class="klant-card">
+          <div class="klant-icon">🏫</div>
+          <div>
+            <h4>Scholen</h4>
+            <p>Veilig en up-to-date</p>
+          </div>
+        </div>
+        <div class="klant-card">
+          <div class="klant-icon">🏘️</div>
+          <div>
+            <h4>Woningbouwverenigingen</h4>
+            <p>Grootschalig en efficiënt</p>
+          </div>
+        </div>
+        <div class="klant-card">
+          <div class="klant-icon">🏛️</div>
+          <div>
+            <h4>Verenigingen</h4>
+            <p>Clubhuizen en accommodaties</p>
+          </div>
+        </div>
+        <div class="klant-card">
+          <div class="klant-icon">🏗️</div>
+          <div>
+            <h4>Utiliteit</h4>
+            <p>Grote projecten, vakkundige aanpak</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DUURZAAMHEID BANNER -->
+  <div class="duurzaam-banner" id="duurzaamheid">
+    <div class="duurzaam-inner">
+      <div>
+        <h2>Klaar voor een duurzamere toekomst?</h2>
+        <p>Van zonnepanelen en warmtepompen tot laadpalen en LED-verlichting — IBR helpt u de stap naar duurzame energie te zetten.</p>
+      </div>
+      <a href="#contact" class="btn-white">Vraag gratis advies aan</a>
+    </div>
+  </div>
+
+  <!-- CONTACT -->
+  <section id="contact">
+    <div class="section-inner contact-grid">
+      <div class="contact-info">
+        <p class="section-label">Contact</p>
+        <h2>Neem contact met ons op</h2>
+        <p>Heeft u een vraag, wilt u een offerte of wilt u een afspraak maken? Wij staan voor u klaar.</p>
+        <div class="contact-items">
+          <div class="contact-item">
+            <div class="contact-item-icon">📍</div>
+            <div class="contact-item-text">
+              <strong>Adres</strong>
+              <span>Rucphen, Noord-Brabant</span>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-item-icon">📞</div>
+            <div class="contact-item-text">
+              <strong>Telefoon</strong>
+              <span><a href="tel:+31165380000">Bel ons voor informatie</a></span>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-item-icon">✉️</div>
+            <div class="contact-item-text">
+              <strong>E-mail</strong>
+              <span><a href="mailto:info@ibr-rucphen.nl">info@ibr-rucphen.nl</a></span>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-item-icon">🕐</div>
+            <div class="contact-item-text">
+              <strong>Openingstijden</strong>
+              <span>Maandag – vrijdag: 07:30 – 17:00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-form">
+        <h3>Stuur ons een bericht</h3>
+        <form onsubmit="handleSubmit(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Voornaam</label>
+              <input type="text" placeholder="Jan" required />
+            </div>
+            <div class="form-group">
+              <label>Achternaam</label>
+              <input type="text" placeholder="de Vries" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>E-mailadres</label>
+            <input type="email" placeholder="jan@voorbeeld.nl" required />
+          </div>
+          <div class="form-group">
+            <label>Telefoonnummer</label>
+            <input type="tel" placeholder="+31 6 12345678" />
+          </div>
+          <div class="form-group">
+            <label>Onderwerp</label>
+            <select>
+              <option value="">Kies een onderwerp...</option>
+              <option>Offerte aanvragen</option>
+              <option>Nieuwbouw / utiliteit</option>
+              <option>Renovatie / verbouwing</option>
+              <option>Duurzaamheid</option>
+              <option>Storing / service</option>
+              <option>Vacature</option>
+              <option>Overig</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Bericht</label>
+            <textarea rows="4" placeholder="Beschrijf uw vraag of project..."></textarea>
+          </div>
+          <button type="submit" class="form-submit">Verstuur bericht →</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- VACATURES -->
+  <section style="background:#F4F4F4;padding:70px 5%;" id="vacatures">
+    <div class="section-inner" style="text-align:center;">
+      <p class="section-label">Werken bij IBR</p>
+      <h2 class="section-title" style="margin:0 auto 16px;">Kom ons team versterken</h2>
+      <p style="color:#6B6B6B;max-width:500px;margin:0 auto 36px;line-height:1.7;font-size:.95rem;">
+        IBR Installatie groeit en is altijd op zoek naar gemotiveerde installateurs en leerling-monteurs. Werken in een hecht team, in de eigen regio — dat is werken bij IBR.
+      </p>
+      <a href="#contact" class="btn-primary">Bekijk vacatures & solliciteer</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+            <div class="diamond-grid" style="width:36px;height:36px;">
+              <span class="d-blue"></span>
+              <span class="d-red"></span>
+              <span class="d-white"></span>
+              <span class="d-green"></span>
+            </div>
+            <strong style="color:#fff;font-size:1.3rem;letter-spacing:2px;">IBR</strong>
+          </div>
+          <p>Installatie Bureau Rucphen — uw betrouwbare installatiepartner in de regio Noord-Brabant, sinds 1999.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Diensten</h4>
+          <ul>
+            <li><a href="#diensten">Nieuwbouw & utiliteit</a></li>
+            <li><a href="#diensten">Renovatie & verbouwing</a></li>
+            <li><a href="#duurzaamheid">Duurzaamheid</a></li>
+            <li><a href="#diensten">Projecten</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Bedrijf</h4>
+          <ul>
+            <li><a href="#over">Over ons</a></li>
+            <li><a href="#contact">Contact</a></li>
+            <li><a href="#vacatures">Vacatures</a></li>
+            <li><a href="#contact">Tarieven</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 IBR Installatie Rucphen. Alle rechten voorbehouden.</span>
+        <span>Rucphen, Noord-Brabant</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function handleSubmit(e) {
+      e.preventDefault();
+      const btn = e.target.querySelector('.form-submit');
+      btn.textContent = 'Verstuurd! ✓';
+      btn.style.background = '#3A9A3E';
+      setTimeout(() => {
+        btn.textContent = 'Verstuur bericht →';
+        btn.style.background = '';
+        e.target.reset();
+      }, 3000);
+    }
+
+    // Smooth nav highlight
+    const sections = document.querySelectorAll('section[id], div[id]');
+    const navLinks = document.querySelectorAll('.nav-links a');
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(s => {
+        if (window.scrollY >= s.offsetTop - 100) current = s.id;
+      });
+      navLinks.forEach(a => {
+        a.style.color = a.getAttribute('href') === '#' + current ? 'var(--blauw)' : '';
+      });
+    });
+  </script>
+
+</body>
+</html>
